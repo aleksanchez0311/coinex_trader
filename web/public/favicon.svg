@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="a" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e3a8a" />
+            <stop offset="100%" stop-color="#3b82f6" />
+        </linearGradient>
+        <linearGradient id="b" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#60a5fa" />
+            <stop offset="100%" stop-color="#22d3ee" />
+        </linearGradient>
+    </defs>
+    <circle cx="256" cy="256" r="240" stroke="url(#a)" stroke-width="12" />
+    <circle cx="256" cy="256" r="220" fill="url(#b)" />
+    <text x="50%" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800"
+        font-size="89" fill="#1e3a8a">COINEX</text>
+    <text x="50%" y="330" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800"
+        font-size="89" fill="#1e3a8a">TRADER</text>
+</svg>

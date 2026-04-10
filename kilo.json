@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "agent": "trader",
+  "commands": {
+    "main": "Comandos principales de desarrollo y build"
+  },
+  "description": "CoinEx Trader - Platform for intraday crypto trading with SMC"
+}
