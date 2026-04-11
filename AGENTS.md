@@ -8,45 +8,64 @@ Cryptocurrency intraday trading platform for futures with SMC + EMA + RSI + ATR 
 
 ```
 trader/
-├── backend/                    # FastAPI (Python)
-│   ├── main.py                 # API endpoints
-│   ├── engines/               # Analysis, scoring, risk engines
-│   ├── utils/                 # CoinEx client
-│   └── .env                   # API credentials
-├── web/                       # React + Vite
-│   ├── src/
-│   │   ├── App.jsx            # Main app component
-│   │   └── components/        # UI components
-│   └── .env                   # Vite config
-├── README.md                  # Documentation
-├── specs.md                   # Technical specs
-└── .gitignore                # Git ignore
+├── app/                          # Aplicacion principal
+│   ├── backend/                  # FastAPI (Python)
+│   │   ├── main.py               # API endpoints
+│   │   ├── engines/              # Analysis, scoring, risk engines
+│   │   ├── models/              # Pydantic models
+│   │   └── utils/               # CoinEx client
+│   └── web/                      # React + Vite
+│       ├── src/
+│       │   ├── App.jsx          # Main app component
+│       │   └── components/      # UI components
+│       └── package.json
+├── release/                      # Windows executable
+│   ├── build.bat                # Build script
+│   ├── create_icon.bat          # Icon generator
+│   └── launcher.cs              # Launcher source
+├── CoinExTrader.exe             # Compiled executable
+├── favicon.ico                  # Application icon
+├── .env.example                 # Environment template
+├── README.md                    # Documentation
+├── specs.md                     # Technical specs
+└── .gitignore                   # Git ignore
 ```
 
 ## Key Files
 
 ### Backend
-- `backend/main.py` - FastAPI endpoints
-- `backend/engines/analysis.py` - SMC analysis engine
-- `backend/engines/risk.py` - Position sizing
-- `backend/engines/scoring.py` - Trade quality scoring
-- `backend/utils/coinex_client.py` - CoinEx API integration
+- `app/backend/main.py` - FastAPI endpoints
+- `app/backend/engines/analysis.py` - SMC analysis engine
+- `app/backend/engines/risk.py` - Position sizing
+- `app/backend/engines/scoring.py` - Trade quality scoring
+- `app/backend/utils/coinex_client.py` - CoinEx API integration
 
 ### Frontend
-- `web/src/App.jsx` - Main app with state management
-- `web/src/components/MarketList.jsx` - Favorites, risk form, open trade
-- `web/src/components/AnalysisBoard.jsx` - Analysis display
-- `web/src/components/PositionsTable.jsx` - Open positions
-- `web/src/components/Sidebar.jsx` - Navigation
+- `app/web/src/App.jsx` - Main app with state management
+- `app/web/src/components/MarketList.jsx` - Favorites, risk form, open trade
+- `app/web/src/components/AnalysisBoard.jsx` - Analysis display
+- `app/web/src/components/PositionsTable.jsx` - Open positions
+- `app/web/src/components/Sidebar.jsx` - Navigation
+- `app/web/src/components/Header.jsx` - Top header
+- `app/web/src/components/RiskPanel.jsx` - Risk management panel
+- `app/web/src/components/StrategyView.jsx` - Strategy display
+- `app/web/src/components/RiskManagementView.jsx` - Risk management view
+
+### Launcher
+- `release/build.bat` - Build executable script
+- `release/launcher.cs` - C# launcher code
 
 ## Commands
 
 ```bash
 # Backend
-cd backend && python main.py
+cd app/backend && python main.py
 
 # Frontend
-cd web && npm run dev
+cd app/web && npm run dev
+
+# Build executable (Windows)
+cd release && build.bat
 ```
 
 ## Configuration
@@ -59,10 +78,10 @@ cd web && npm run dev
 
 ```bash
 # Backend tests (if any)
-cd backend && pytest
+cd app/backend && pytest
 
 # Frontend lint
-cd web && npm run lint
+cd app/web && npm run lint
 ```
 
 ## Known Issues

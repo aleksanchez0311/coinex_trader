@@ -19,7 +19,7 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 │                    │  App.jsx    │                          │
 │                    └──────┬──────┘                          │
 └───────────────────────────┼─────────────────────────────────┘
-                            │ HTTP
+                             │ HTTP
 ┌───────────────────────────▼─────────────────────────────────┐
 │                     BACKEND (FastAPI)                        │
 │  ┌─────────────────────────────────────────────────────────┐ │
@@ -112,7 +112,7 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 
 - API Keys almacenadas en localStorage del navegador
 - Fallback a variables de entorno (.env)
-- nunca exponer secretos en frontend
+- Nunca exponer secretos en frontend
 - Validación de inputs con Pydantic
 
 ## 📦 Dependencias
@@ -132,6 +132,29 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - framer-motion
 - lucide-react
 
+### Launcher (Windows)
+- .NET Framework 4.x
+- C# (compilador csc.exe)
+- Git, Python, Node.js (runtime)
+
+## 🖥️ Launcher Windows
+
+### Compilación
+```cmd
+cd release
+build.bat
+```
+Genera `CoinExTrader.exe` + `favicon.ico`
+
+### Flujo del Launcher
+1. Verifica si ya hay una copia en `%LOCALAPPDATA%\CoinExTrader`
+2. Si no existe: `git clone` desde GitHub
+3. Instala dependencias (pip + npm install + npm run build)
+4. Inicia backend (Python) y frontend (npm run preview)
+5. Abre navegador en localhost:4173
+6. Minimiza a System Tray
+7. Click derecho → "Recargar Proyecto" (git pull + reinstall)
+
 ## 🔄 Actualizaciones
 
 Todas las actualizaciones de datos se ejecutan cuando la app gana foco (visibilitychange event):
@@ -147,3 +170,4 @@ Todas las actualizaciones de datos se ejecutan cuando la app gana foco (visibili
 - Solo futuros perpetuos CoinEx
 - Sin soporte para órdenes OCO
 - Sin trailing stop
+- Solo Windows (.exe launcher)

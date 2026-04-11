@@ -17,7 +17,6 @@ namespace TraderLauncher
         {
             if (mutex.WaitOne(TimeSpan.Zero, true))
             {
-                // First instance
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new TraderApplicationContext());
@@ -25,7 +24,6 @@ namespace TraderLauncher
             }
             else
             {
-                // Already running, just open the browser
                 Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
             }
         }
@@ -37,22 +35,22 @@ namespace TraderLauncher
         private LoadingForm loadingForm;
         private Process backendProcess;
         private Process frontendProcess;
+        private string appDataDir;
 
         public TraderApplicationContext()
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string iconPath = Path.Combine(baseDir, "favicon.ico");
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? baseDir;
-            if (!File.Exists(iconPath))
-                iconPath = Path.Combine(exeDir, "favicon.ico");
+            string iconPath = Path.Combine(exeDir, "favicon.ico");
+            
+            appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CoinExTrader");
             
             trayIcon = new NotifyIcon()
             {
-                Icon = File.Exists(iconPath) 
-                    ? new Icon(iconPath)
-                    : SystemIcons.Application,
+                Icon = File.Exists(iconPath) ? new Icon(iconPath) : SystemIcons.Application,
                 ContextMenu = new ContextMenu(new MenuItem[] {
                     new MenuItem("Abrir en el Navegador", OpenBrowser),
+                    new MenuItem("Recargar Proyecto", RefreshProject),
                     new MenuItem("Apagar y Salir", ExitApp)
                 }),
                 Visible = true,
@@ -71,61 +69,149 @@ namespace TraderLauncher
         {
             try
             {
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string projectDir = Path.GetFullPath(Path.Combine(baseDir, ".."));
-
-                string backendDir = Path.Combine(projectDir, "backend");
-                string webDir = Path.Combine(projectDir, "web");
-
-                // Step 1: Run Setup Bat (installs requirements, builds)
-                ProcessStartInfo psiSetup = new ProcessStartInfo();
-                psiSetup.FileName = "cmd.exe";
-                psiSetup.Arguments = "/c \"setup_and_run.bat\"";
-                psiSetup.CreateNoWindow = true;
-                psiSetup.UseShellExecute = false;
-                psiSetup.WorkingDirectory = projectDir;
-
-                using (Process procSetup = Process.Start(psiSetup))
+                UpdateStatus("Verificando proyecto...");
+                
+                if (!Directory.Exists(Path.Combine(appDataDir, "app")))
                 {
-                    procSetup.WaitForExit();
+                    UpdateStatus("Descargando proyecto desde GitHub...");
+                    CloneProject();
+                    UpdateStatus("Esperando descarga...");
+                    await Task.Delay(5000);
                 }
 
-                // Step 2: Start Backend
-                ProcessStartInfo psiBackend = new ProcessStartInfo();
-                psiBackend.FileName = "cmd.exe";
-                psiBackend.Arguments = "/c \"call .venv\\Scripts\\activate.bat && python main.py\"";
-                psiBackend.CreateNoWindow = true;
-                psiBackend.UseShellExecute = false;
-                psiBackend.WorkingDirectory = backendDir;
-                backendProcess = Process.Start(psiBackend);
+                UpdateStatus("Instalando dependencias...");
+                InstallDependencies();
+                await Task.Delay(3000);
 
-                // Step 3: Start Frontend
-                ProcessStartInfo psiFrontend = new ProcessStartInfo();
-                psiFrontend.FileName = "cmd.exe";
-                psiFrontend.Arguments = "/c \"npm run preview --host\"";
-                psiFrontend.CreateNoWindow = true;
-                psiFrontend.UseShellExecute = false;
-                psiFrontend.WorkingDirectory = webDir;
-                frontendProcess = Process.Start(psiFrontend);
+                UpdateStatus("Iniciando servidores...");
+                StartServers();
 
-                await Task.Delay(3000); // Wait for servers to be ready
+                await Task.Delay(3000);
 
                 loadingForm.Invoke(new Action(() => {
                     loadingForm.Close();
                 }));
 
-                // Open Browser
                 Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al iniciar el sistema: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error al iniciar: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void CloneProject()
+        {
+            Directory.CreateDirectory(appDataDir);
+            
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "git";
+            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git .";
+            psi.WorkingDirectory = appDataDir;
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            
+            using (Process proc = Process.Start(psi))
+            {
+                proc.WaitForExit();
+            }
+        }
+
+        private void InstallDependencies()
+        {
+            string backendDir = Path.Combine(appDataDir, "app", "backend");
+            string webDir = Path.Combine(appDataDir, "app", "web");
+
+            if (!Directory.Exists(backendDir))
+            {
+                Directory.CreateDirectory(backendDir);
+            }
+            if (!Directory.Exists(webDir))
+            {
+                Directory.CreateDirectory(webDir);
+            }
+
+            if (File.Exists(Path.Combine(backendDir, "requirements.txt")) && !Directory.Exists(Path.Combine(backendDir, ".venv")))
+            {
+                ProcessStartInfo psiBackend = new ProcessStartInfo();
+                psiBackend.FileName = "cmd.exe";
+                psiBackend.Arguments = "/c \"cd /d " + backendDir + " && python -m venv .venv && .\\.venv\\Scripts\\pip.exe install -r requirements.txt\"";
+                psiBackend.CreateNoWindow = true;
+                psiBackend.UseShellExecute = false;
+                using (Process.Start(psiBackend)) { }
+            }
+
+            if (File.Exists(Path.Combine(webDir, "package.json")) && !Directory.Exists(Path.Combine(webDir, "node_modules")))
+            {
+                ProcessStartInfo psiNpm = new ProcessStartInfo();
+                psiNpm.FileName = "cmd.exe";
+                psiNpm.Arguments = "/c \"cd /d " + webDir + " && npm install && npm run build\"";
+                psiNpm.CreateNoWindow = true;
+                psiNpm.UseShellExecute = false;
+                using (Process.Start(psiNpm)) { }
+            }
+        }
+
+        private void StartServers()
+        {
+            string backendDir = Path.Combine(appDataDir, "app", "backend");
+            string webDir = Path.Combine(appDataDir, "app", "web");
+
+            if (!Directory.Exists(backendDir) || !File.Exists(Path.Combine(backendDir, "main.py")))
+            {
+                UpdateStatus("Esperando a que se clone el proyecto...");
+                System.Threading.Thread.Sleep(5000);
+            }
+
+            ProcessStartInfo psiBackend = new ProcessStartInfo();
+            psiBackend.FileName = "cmd.exe";
+            psiBackend.Arguments = "/k \"cd /d \"" + backendDir + "\" && .\\.venv\\Scripts\\python.exe main.py\"";
+            psiBackend.CreateNoWindow = false;
+            psiBackend.UseShellExecute = false;
+            backendProcess = Process.Start(psiBackend);
+
+            ProcessStartInfo psiFrontend = new ProcessStartInfo();
+            psiFrontend.FileName = "cmd.exe";
+            psiFrontend.Arguments = "/k \"cd /d \"" + webDir + "\" && npm run dev\"";
+            psiFrontend.CreateNoWindow = false;
+            psiFrontend.UseShellExecute = false;
+            frontendProcess = Process.Start(psiFrontend);
+        }
+
+        private void UpdateStatus(string message)
+        {
+            loadingForm.Invoke(new Action(() => {
+                loadingForm.UpdateStatus(message);
+            }));
         }
 
         private void OpenBrowser(object sender, EventArgs e)
         {
             Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
+        }
+
+        private void RefreshProject(object sender, EventArgs e)
+        {
+            try
+            {
+                if (backendProcess != null && !backendProcess.HasExited) backendProcess.Kill();
+                if (frontendProcess != null && !frontendProcess.HasExited) frontendProcess.Kill();
+
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = "git";
+                psi.Arguments = "pull";
+                psi.WorkingDirectory = appDataDir;
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                using (Process.Start(psi)) { }
+
+                InstallDependencies();
+                StartServers();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al recargar: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ExitApp(object sender, EventArgs e)
@@ -134,28 +220,14 @@ namespace TraderLauncher
 
             if (backendProcess != null && !backendProcess.HasExited)
             {
-                KillProcessTree(backendProcess.Id);
+                backendProcess.Kill();
             }
             if (frontendProcess != null && !frontendProcess.HasExited)
             {
-                KillProcessTree(frontendProcess.Id);
+                frontendProcess.Kill();
             }
 
             Application.Exit();
-        }
-
-        private void KillProcessTree(int pid)
-        {
-            try
-            {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = "taskkill";
-                psi.Arguments = string.Format("/T /F /PID {0}", pid);
-                psi.CreateNoWindow = true;
-                psi.UseShellExecute = false;
-                Process.Start(psi).WaitForExit();
-            }
-            catch { }
         }
     }
 
@@ -169,7 +241,7 @@ namespace TraderLauncher
             string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "favicon.ico");
             this.Icon = File.Exists(iconPath) ? new Icon(iconPath) : SystemIcons.Application;
             
-            this.Text = "Trader Launcher";
+            this.Text = "CoinEx Trader";
             this.Size = new Size(400, 150);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -177,7 +249,7 @@ namespace TraderLauncher
             this.ShowInTaskbar = true;
 
             Label titleLabel = new Label();
-            titleLabel.Text = "Coinex Trader";
+            titleLabel.Text = "CoinEx Trader";
             titleLabel.ForeColor = Color.White;
             titleLabel.Font = new Font("Segoe UI", 14, FontStyle.Bold);
             titleLabel.AutoSize = true;
@@ -185,7 +257,7 @@ namespace TraderLauncher
             this.Controls.Add(titleLabel);
 
             statusLabel = new Label();
-            statusLabel.Text = "Configurando e iniciando servidores, espere por favor...";
+            statusLabel.Text = "Iniciando...";
             statusLabel.ForeColor = Color.LightGray;
             statusLabel.Font = new Font("Segoe UI", 9, FontStyle.Regular);
             statusLabel.AutoSize = true;
@@ -198,6 +270,11 @@ namespace TraderLauncher
             progressBar.Location = new Point(20, 80);
             progressBar.Size = new Size(360, 20);
             this.Controls.Add(progressBar);
+        }
+
+        public void UpdateStatus(string message)
+        {
+            statusLabel.Text = message;
         }
     }
 }

@@ -1,6 +1,6 @@
 # CoinEx Trader - Intraday Trading Platform
 
-Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart Money Concepts (SMC)** + EMA + RSI + ATR.
+Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart MoneyConcepts (SMC)** + EMA + RSI + ATR.
 
 ## 🚀 Características
 
@@ -22,27 +22,34 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 
 ```
 trader/
-├── backend/                    # FastAPI (Python)
-│   ├── main.py                 # Endpoints API
-│   ├── engines/
-│   │   ├── analysis.py         # Motor de análisis SMC
-│   │   ├── scoring.py          # Scoring de setups
-│   │   └── risk.py             # Gestión de riesgo
-│   ├── models/
-│   │   └── trading.py          # Modelos Pydantic
-│   └── utils/
-│       └── coinex_client.py    # Cliente CoinEx (CCXT)
-├── web/                         # React + Vite
-│   ├── src/
-│   │   ├── components/          # Componentes UI
-│   │   ├── App.jsx              # Componente principal
-│   │   └── index.css            # Estilos Tailwind
-│   ├── package.json
-│   └── tailwind.config.js
-├── .env.example                 # Variables de entorno ejemplo
-├── AGENTS.md                    # Configuración de agentes IA
-├── specs.md                     # Especificaciones técnicas
-└── README.md                   # Este archivo
+├── app/                          # Aplicación
+│   ├── backend/                  # FastAPI (Python)
+│   │   ├── main.py               # Endpoints API
+│   │   ├── engines/
+│   │   │   ├── analysis.py       # Motor de análisis SMC
+│   │   │   ├── scoring.py        # Scoring de setups
+│   │   │   └── risk.py           # Gestión de riesgo
+│   │   ├── models/
+│   │   │   └── trading.py        # Modelos Pydantic
+│   │   └── utils/
+│   │       └── coinex_client.py  # Cliente CoinEx (CCXT)
+│   └── web/                      # React + Vite
+│       ├── src/
+│       │   ├── components/       # Componentes UI
+│       │   ├── App.jsx           # Componente principal
+│       │   └── index.css         # Estilos Tailwind
+│       ├── package.json
+│       └── tailwind.config.js
+├── release/                      # Launcher Windows
+│   ├── build.bat                 # Script de compilación
+│   ├── create_icon.bat           # Generador de icono
+│   └── launcher.cs               # Código fuente
+├── CoinExTrader.exe              # Ejecutable compilado
+├── favicon.ico                   # Icono de la aplicación
+├── .env.example                  # Variables de entorno ejemplo
+├── AGENTS.md                     # Configuración de agentes IA
+├── specs.md                      # Especificaciones técnicas
+└── README.md                     # Este archivo
 ```
 
 ## 🛠️ Instalación
@@ -50,7 +57,7 @@ trader/
 ### Backend
 
 ```bash
-cd backend
+cd app/backend
 pip install -r requirements.txt
 python main.py
 ```
@@ -60,7 +67,7 @@ El servidor correrá en `http://localhost:8000`
 ### Frontend
 
 ```bash
-cd web
+cd app/web
 npm install
 npm run dev
 ```
@@ -128,70 +135,45 @@ La estrategia combina:
 | `/markets` | GET | Lista de mercados disponibles |
 | `/positions` | GET | Posiciones abiertas |
 
-## ⚠️ Disclaimer
+## 🖥️ Ejecutable Windows (Launcher)
 
-Esta herramienta es experimental. El trading de futuros conlleva un riesgo significativo. Úsese bajo su propia responsabilidad.
+El launcher descarga el proyecto desde GitHub, instala dependencias y ejecuta automáticamente.
 
----
+### Compilar el ejecutable
 
-## 🖥️ Crear Ejecutable Windows (Launcher)
+```cmd
+cd release
+build.bat
+```
 
-El proyecto incluye `CoinExTrader.exe` en la carpeta `release/` que permite ejecutar la aplicación con una ventana de carga y control desde el área de notificaciones (System Tray).
+Genera `CoinExTrader.exe` + `favicon.ico`
 
 ### Requisitos previos
 
 1. **.NET Framework 4.x** (incluido en Windows 10/11)
-2. **Python** y **Node.js** instalados
-3. El proyecto debe tener las carpetas `backend/` y `web/` con sus dependencias ya instaladas
+2. **Git** instalado
+3. **Python** instalado
+4. **Node.js** instalado
 
-### Pasos para compilar
+### Uso
 
-#### 1. Crear icono ICO (si no existe)
+1. Ejecutar `CoinExTrader.exe`
+2. Primera vez: Descarga el proyecto desde GitHub a `%LOCALAPPDATA%\CoinExTrader`
+3. Instala dependencias (backend + frontend)
+4. Inicia servidores y abre navegador en `http://localhost:4173`
+5. Icono en System Tray → "Abrir en el Navegador" o "Apagar y Salir"
 
-```cmd
-cd release
-create_icon.bat
-```
+### Actualizar proyecto
 
-O manualmente:
-
-```powershell
-# Crear script de generación de icono
-$script = @'
-Add-Type -AssemblyName System.Drawing
-$bmp = New-Object System.Drawing.Bitmap(32,32)
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.Clear([System.Drawing.Color]::FromArgb(30,58,138))
-$g.FillEllipse([System.Drawing.Brushes]::DodgerBlue, 2, 2, 28, 28)
-$g.Dispose()
-$ico = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
-$fs = [System.IO.FileStream]::new("favicon.ico", [System.IO.FileMode]::Create)
-$ico.Save($fs)
-$fs.Close()
-$bmp.Dispose()
-'@
-
-$script | Out-File -FilePath "create_icon.ps1" -Encoding UTF8
-powershell -ExecutionPolicy Bypass -File "create_icon.ps1"
-del create_icon.ps1
-```
-
-#### 2. Compilar el ejecutable
-
-```cmd
-cd release
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe /target:winexe /out:CoinExTrader.exe /win32icon:favicon.ico launcher.cs
-```
-
-> **Nota**: Si no tienes el archivo `favicon.ico`, omite el parámetro `/win32icon:favicon.ico`
+Hacer click derecho en el icono del tray → "Recargar Proyecto" (hace git pull)
 
 ### Uso del Launcher
 
-1. Ejecutar `release/CoinExTrader.exe`
+1. Ejecutar `CoinExTrader.exe`
 2. Ver ventana de carga mientras se inicializan los servidores
 3. Se abre automáticamente el navegador en `http://localhost:4173`
 4. El icono queda en el área de notificaciones (System Tray)
-5. **Click derecho** → "Abrir App en el Navegador" o "Cerrar Servidores y Salir"
+5. **Click derecho** → "Abrir en el Navegador" o "Apagar y Salir"
 
 ### Características
 
@@ -199,3 +181,7 @@ C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe /target:winexe /out:CoinEx
 - **Control de procesos**: Inicia y termina Python y Node.js correctamente
 - **Prevención de duplicados**: Si ya está corriendo, solo abre el navegador
 - **Icono personalizado**: Usa el icono del proyecto
+
+## ⚠️ Disclaimer
+
+Esta herramienta es experimental. El trading de futuros conlleva un riesgo significativo. Úsese bajo su propia responsabilidad.
