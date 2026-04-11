@@ -24,7 +24,7 @@ namespace TraderLauncher
             }
             else
             {
-                Process.Start(new ProcessStartInfo("http://localhost:5173") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
             }
         }
     }
@@ -75,24 +75,19 @@ namespace TraderLauncher
                 {
                     UpdateStatus("Descargando de GitHub...");
                     CloneProject();
-                    UpdateStatus("Esperando descarga...");
-                    await Task.Delay(5000);
+                    UpdateStatus("Descarga completada.");
                 }
 
-                UpdateStatus("Instalando dependencias...");
                 InstallDependencies();
-                await Task.Delay(3000);
 
                 UpdateStatus("Iniciando servidores...");
                 StartServers();
-
-                await Task.Delay(3000);
 
                 loadingForm.Invoke(new Action(() => {
                     loadingForm.Close();
                 }));
 
-                Process.Start(new ProcessStartInfo("http://localhost:5173") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
             }
             catch (Exception ex)
             {
@@ -110,6 +105,8 @@ namespace TraderLauncher
             psi.WorkingDirectory = appDataDir;
             psi.CreateNoWindow = true;
             psi.UseShellExecute = false;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
             
             using (Process proc = Process.Start(psi))
             {
@@ -133,22 +130,52 @@ namespace TraderLauncher
 
             if (File.Exists(Path.Combine(backendDir, "requirements.txt")) && !Directory.Exists(Path.Combine(backendDir, ".venv")))
             {
+                UpdateStatus("Creando venv backend...");
                 ProcessStartInfo psiBackend = new ProcessStartInfo();
                 psiBackend.FileName = "cmd.exe";
-                psiBackend.Arguments = "/c \"cd /d " + backendDir + " && python -m venv .venv && .\\.venv\\Scripts\\pip.exe install -r requirements.txt\"";
+                psiBackend.Arguments = "/c \"cd /d " + backendDir + " && python -m venv .venv\"";
                 psiBackend.CreateNoWindow = true;
                 psiBackend.UseShellExecute = false;
-                using (Process.Start(psiBackend)) { }
+                using (Process proc = Process.Start(psiBackend))
+                {
+                    proc.WaitForExit();
+                }
+
+                UpdateStatus("Instalando dependencias Python...");
+                ProcessStartInfo psiPip = new ProcessStartInfo();
+                psiPip.FileName = "cmd.exe";
+                psiPip.Arguments = "/c \"cd /d " + backendDir + " && .\\.venv\\Scripts\\pip.exe install -r requirements.txt\"";
+                psiPip.CreateNoWindow = true;
+                psiPip.UseShellExecute = false;
+                using (Process proc = Process.Start(psiPip))
+                {
+                    proc.WaitForExit();
+                }
             }
 
             if (File.Exists(Path.Combine(webDir, "package.json")) && !Directory.Exists(Path.Combine(webDir, "node_modules")))
             {
+                UpdateStatus("Instalando dependencias Node.js...");
                 ProcessStartInfo psiNpm = new ProcessStartInfo();
                 psiNpm.FileName = "cmd.exe";
-                psiNpm.Arguments = "/c \"cd /d " + webDir + " && npm install && npm run build\"";
+                psiNpm.Arguments = "/c \"cd /d " + webDir + " && npm install\"";
                 psiNpm.CreateNoWindow = true;
                 psiNpm.UseShellExecute = false;
-                using (Process.Start(psiNpm)) { }
+                using (Process proc = Process.Start(psiNpm))
+                {
+                    proc.WaitForExit();
+                }
+
+                UpdateStatus("Compilando frontend...");
+                ProcessStartInfo psiBuild = new ProcessStartInfo();
+                psiBuild.FileName = "cmd.exe";
+                psiBuild.Arguments = "/c \"cd /d " + webDir + " && npm run build\"";
+                psiBuild.CreateNoWindow = true;
+                psiBuild.UseShellExecute = false;
+                using (Process proc = Process.Start(psiBuild))
+                {
+                    proc.WaitForExit();
+                }
             }
         }
 
@@ -156,12 +183,6 @@ namespace TraderLauncher
         {
             string backendDir = Path.Combine(appDataDir, "app", "backend");
             string webDir = Path.Combine(appDataDir, "app", "web");
-
-            if (!Directory.Exists(backendDir) || !File.Exists(Path.Combine(backendDir, "main.py")))
-            {
-                UpdateStatus("Esperando a que se clone el proyecto...");
-                System.Threading.Thread.Sleep(5000);
-            }
 
             ProcessStartInfo psiBackend = new ProcessStartInfo();
             psiBackend.FileName = "cmd.exe";
@@ -172,7 +193,7 @@ namespace TraderLauncher
 
             ProcessStartInfo psiFrontend = new ProcessStartInfo();
             psiFrontend.FileName = "cmd.exe";
-            psiFrontend.Arguments = "/k \"cd /d \"" + webDir + "\" && npm run dev\"";
+            psiFrontend.Arguments = "/k \"cd /d \"" + webDir + "\" && npm run preview\"";
             psiFrontend.CreateNoWindow = false;
             psiFrontend.UseShellExecute = false;
             frontendProcess = Process.Start(psiFrontend);
