@@ -43,7 +43,7 @@ namespace TraderLauncher
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? baseDir;
             string iconPath = Path.Combine(exeDir, "favicon.ico");
             
-            appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CoinExTrader");
+            appDataDir = exeDir;
             
             trayIcon = new NotifyIcon()
             {
@@ -69,11 +69,11 @@ namespace TraderLauncher
         {
             try
             {
-                UpdateStatus("Verificando proyecto...");
+                UpdateStatus("Dir: " + appDataDir);
                 
                 if (!Directory.Exists(Path.Combine(appDataDir, "app")))
                 {
-                    UpdateStatus("Descargando proyecto desde GitHub...");
+                    UpdateStatus("Descargando de GitHub...");
                     CloneProject();
                     UpdateStatus("Esperando descarga...");
                     await Task.Delay(5000);
@@ -106,7 +106,7 @@ namespace TraderLauncher
             
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "git";
-            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git .";
+            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git";
             psi.WorkingDirectory = appDataDir;
             psi.CreateNoWindow = true;
             psi.UseShellExecute = false;
