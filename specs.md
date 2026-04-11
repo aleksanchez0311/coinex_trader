@@ -142,16 +142,16 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 ### Compilación
 ```cmd
 cd release
-build.bat
+create_exe.bat
 ```
 Genera `CoinExTrader.exe` + `favicon.ico`
 
 ### Flujo del Launcher
-1. Verifica si ya hay una copia en `%LOCALAPPDATA%\CoinExTrader`
-2. Si no existe: `git clone` desde GitHub
+1. Se ejecuta desde el directorio donde está el exe
+2. Si no existe proyecto: `git clone` desde GitHub
 3. Instala dependencias (pip + npm install + npm run build)
-4. Inicia backend (Python) y frontend (npm run preview)
-5. Abre navegador en localhost:4173
+4. Inicia backend (Python) y frontend (npm run dev)
+5. Abre navegador en localhost:5173
 6. Minimiza a System Tray
 7. Click derecho → "Recargar Proyecto" (git pull + reinstall)
 

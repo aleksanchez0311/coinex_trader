@@ -1,0 +1,89 @@
+@echo off
+cd /d "%~dp0.."
+
+echo ===================================================
+echo   Compilando CoinEx Trader Launcher
+echo ===================================================
+
+set MISSING=0
+
+git --version >nul 2>&1
+if %errorlevel% neq 0 goto git_miss
+goto py_check
+:git_miss
+echo [FALTA] Git no esta instalado
+set MISSING=1
+
+:py_check
+python --version >nul 2>&1
+if %errorlevel% neq 0 goto py_miss
+goto node_check
+:py_miss
+echo [FALTA] Python no esta instalado
+set MISSING=1
+
+:node_check
+node --version >nul 2>&1
+if %errorlevel% neq 0 goto node_miss
+goto dotnet_check
+:node_miss
+echo [FALTA] Node.js no esta instalado
+set MISSING=1
+
+:dotnet_check
+if not exist "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe" goto dotnet_miss
+goto check_done
+:dotnet_miss
+echo [FALTA] .NET Framework 4 no esta instalado
+set MISSING=1
+
+:check_done
+if %MISSING%==1 goto deps_error
+
+if not exist "favicon.ico" goto gen_icon
+goto compile
+
+:gen_icon
+echo favicon.ico no encontrado, generando icono...
+call release\iconify
+if not exist "favicon.ico" goto icon_error
+
+:compile
+C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe /target:winexe /win32icon:favicon.ico /out:CoinExTrader.exe release\exeify.cs
+if errorlevel 1 goto compile_error
+
+echo.
+echo ===================================================
+echo   Compilacion completada: CoinExTrader.exe
+echo ===================================================
+goto end
+
+:deps_error
+echo.
+echo ===================================================
+echo   ERROR: Faltan dependencias
+echo ===================================================
+echo.
+echo Instalar con winget (como administrador):
+echo   winget install Git
+echo   winget install Python
+echo   winget install NodeJS
+echo.
+echo O descargar desde:
+echo   https://git-scm.com
+echo   https://python.org
+echo   https://nodejs.org
+echo.
+pause
+goto end
+
+:icon_error
+echo ERROR: No se pudo generar favicon.ico
+pause
+goto end
+
+:compile_error
+echo Error en la compilacion
+pause
+
+:end

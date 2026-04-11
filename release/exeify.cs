@@ -24,7 +24,7 @@ namespace TraderLauncher
             }
             else
             {
-                Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("http://localhost:5173") { UseShellExecute = true });
             }
         }
     }
@@ -92,7 +92,7 @@ namespace TraderLauncher
                     loadingForm.Close();
                 }));
 
-                Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("http://localhost:5173") { UseShellExecute = true });
             }
             catch (Exception ex)
             {
@@ -187,7 +187,7 @@ namespace TraderLauncher
 
         private void OpenBrowser(object sender, EventArgs e)
         {
-            Process.Start(new ProcessStartInfo("http://localhost:4173") { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo("http://localhost:5173") { UseShellExecute = true });
         }
 
         private void RefreshProject(object sender, EventArgs e)

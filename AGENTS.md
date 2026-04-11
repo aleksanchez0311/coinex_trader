@@ -65,7 +65,13 @@ cd app/backend && python main.py
 cd app/web && npm run dev
 
 # Build executable (Windows)
-cd release && build.bat
+cd release && create_exe.bat
+
+# Generar icono
+cd release && create_icon.bat
+
+# Launcher completo (instala todo y ejecuta)
+launcher.bat
 ```
 
 ## Configuration

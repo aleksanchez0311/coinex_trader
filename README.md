@@ -143,7 +143,7 @@ El launcher descarga el proyecto desde GitHub, instala dependencias y ejecuta au
 
 ```cmd
 cd release
-build.bat
+create_exe.bat
 ```
 
 Genera `CoinExTrader.exe` + `favicon.ico`
@@ -151,16 +151,16 @@ Genera `CoinExTrader.exe` + `favicon.ico`
 ### Requisitos previos
 
 1. **.NET Framework 4.x** (incluido en Windows 10/11)
-2. **Git** instalado
-3. **Python** instalado
-4. **Node.js** instalado
+2. **Git**インストール
+3. **Python**インストール
+4. **Node.js**インストール
 
 ### Uso
 
 1. Ejecutar `CoinExTrader.exe`
-2. Primera vez: Descarga el proyecto desde GitHub a `%LOCALAPPDATA%\CoinExTrader`
+2. El proyecto se ejecuta desde el directorio del exe
 3. Instala dependencias (backend + frontend)
-4. Inicia servidores y abre navegador en `http://localhost:4173`
+4. Inicia servidores y abre navegador en `http://localhost:5173`
 5. Icono en System Tray → "Abrir en el Navegador" o "Apagar y Salir"
 
 ### Actualizar proyecto
@@ -171,7 +171,7 @@ Hacer click derecho en el icono del tray → "Recargar Proyecto" (hace git pull)
 
 1. Ejecutar `CoinExTrader.exe`
 2. Ver ventana de carga mientras se inicializan los servidores
-3. Se abre automáticamente el navegador en `http://localhost:4173`
+3. Se abre automáticamente el navegador en `http://localhost:5173`
 4. El icono queda en el área de notificaciones (System Tray)
 5. **Click derecho** → "Abrir en el Navegador" o "Apagar y Salir"
 

@@ -31,16 +31,14 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+*.local
 
 # Build
 dist/
 dist-ssr/
 build/
-*.local
 
-# Release / Launcher
-release/
+# Compiled
 *.exe
 *.ico
 
