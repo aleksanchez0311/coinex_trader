@@ -82,7 +82,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
       });
       const data = await response.json();
       setResult(data);
-      if (data.plan?.tp1 && tpPrice === 0) {
+      if (data.plan?.tp1) {
         setTpPrice(data.plan.tp1);
       }
     } catch (e) {

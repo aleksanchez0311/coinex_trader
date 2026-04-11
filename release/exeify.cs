@@ -62,21 +62,18 @@ namespace TraderLauncher
             loadingForm = new LoadingForm();
             loadingForm.Show();
 
-            Task.Run(() => StartInitializationAsync());
+            StartInitializationAsync();
         }
 
-        private async Task StartInitializationAsync()
+        private void StartInitializationAsync()
         {
             try
             {
                 UpdateStatus("Dir: " + appDataDir);
                 
-                if (!Directory.Exists(Path.Combine(appDataDir, "app")))
-                {
-                    UpdateStatus("Descargando de GitHub...");
-                    CloneProject();
-                    UpdateStatus("Descarga completada.");
-                }
+                UpdateStatus("Descargando de GitHub...");
+                CloneProject();
+                UpdateStatus("Descarga completada.");
 
                 InstallDependencies();
 
@@ -97,20 +94,59 @@ namespace TraderLauncher
 
         private void CloneProject()
         {
-            Directory.CreateDirectory(appDataDir);
+            string iconPath = Path.Combine(appDataDir, "favicon.ico");
+            string tempIcon = Path.Combine(Path.GetTempPath(), "trader_icon.ico");
+            string appDir = Path.Combine(appDataDir, "app");
             
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = "git";
-            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git .";
-            psi.WorkingDirectory = appDataDir;
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            
-            using (Process proc = Process.Start(psi))
+            if (File.Exists(iconPath))
             {
-                proc.WaitForExit();
+                File.Copy(iconPath, tempIcon, true);
+            }
+            
+            if (!Directory.Exists(appDir))
+            {
+                UpdateStatus("Clonando repositorio...");
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = "cmd.exe";
+                psi.Arguments = "/c \"git clone https://github.com/aleksanchez0311/coinex_trader.git\"";
+                psi.WorkingDirectory = appDataDir;
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
+                
+                using (Process proc = Process.Start(psi))
+                {
+                    proc.WaitForExit();
+                }
+            }
+            else
+            {
+                UpdateStatus("Actualizando con git pull...");
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = "cmd.exe";
+                psi.Arguments = "/c \"git pull\"";
+                psi.WorkingDirectory = appDataDir;
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                psi.RedirectStandardOutput = true;
+                psi.RedirectStandardError = true;
+                
+                using (Process proc = Process.Start(psi))
+                {
+                    proc.WaitForExit();
+                }
+            }
+            
+            if (File.Exists(tempIcon))
+            {
+                File.Copy(tempIcon, iconPath, true);
+            }
+            
+            UpdateStatus("Verificando descarga...");
+            if (!Directory.Exists(appDir))
+            {
+                throw new Exception("Descarga falló - carpeta app no encontrada");
             }
         }
 
@@ -186,21 +222,26 @@ namespace TraderLauncher
 
             ProcessStartInfo psiBackend = new ProcessStartInfo();
             psiBackend.FileName = "cmd.exe";
-            psiBackend.Arguments = "/k \"cd /d \"" + backendDir + "\" && .\\.venv\\Scripts\\python.exe main.py\"";
-            psiBackend.CreateNoWindow = false;
+            psiBackend.Arguments = "/c \"cd /d \"" + backendDir + "\" && .\\.venv\\Scripts\\python.exe main.py\"";
+            psiBackend.CreateNoWindow = true;
             psiBackend.UseShellExecute = false;
             backendProcess = Process.Start(psiBackend);
 
             ProcessStartInfo psiFrontend = new ProcessStartInfo();
             psiFrontend.FileName = "cmd.exe";
-            psiFrontend.Arguments = "/k \"cd /d \"" + webDir + "\" && npm run preview\"";
-            psiFrontend.CreateNoWindow = false;
+            psiFrontend.Arguments = "/c \"cd /d \"" + webDir + "\" && npm run preview\"";
+            psiFrontend.CreateNoWindow = true;
             psiFrontend.UseShellExecute = false;
             frontendProcess = Process.Start(psiFrontend);
         }
 
         private void UpdateStatus(string message)
         {
+            try {
+                string logPath = Path.Combine(appDataDir, "trader.log");
+                File.AppendAllText(logPath, DateTime.Now + ": " + message + Environment.NewLine);
+            } catch { }
+            
             loadingForm.Invoke(new Action(() => {
                 loadingForm.UpdateStatus(message);
             }));
@@ -238,17 +279,49 @@ namespace TraderLauncher
         private void ExitApp(object sender, EventArgs e)
         {
             trayIcon.Visible = false;
-
-            if (backendProcess != null && !backendProcess.HasExited)
+            
+            KillProcessTree(backendProcess != null ? backendProcess.Id : 0);
+            KillProcessTree(frontendProcess != null ? frontendProcess.Id : 0);
+            
+            foreach (var proc in Process.GetProcesses())
             {
-                backendProcess.Kill();
-            }
-            if (frontendProcess != null && !frontendProcess.HasExited)
-            {
-                frontendProcess.Kill();
+                try
+                {
+                    if (proc.ProcessName == "python" || proc.ProcessName == "python3" || 
+                        proc.ProcessName == "node" || proc.ProcessName == "npm")
+                    {
+                        string cmdLine = "";
+                        try { cmdLine = proc.MainModule.FileName; } catch { }
+                        if (cmdLine.Contains("app\\backend") || cmdLine.Contains("app\\web"))
+                        {
+                            proc.Kill();
+                        }
+                    }
+                }
+                catch { }
             }
 
             Application.Exit();
+        }
+        
+        private void KillProcessTree(int pid)
+        {
+            if (pid == 0) return;
+            
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = "cmd.exe";
+                psi.Arguments = "/c \"taskkill /F /T /PID " + pid + "\"";
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                
+                using (Process proc = Process.Start(psi))
+                {
+                    proc.WaitForExit();
+                }
+            }
+            catch { }
         }
     }
 
