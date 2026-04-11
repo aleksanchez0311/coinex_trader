@@ -106,7 +106,7 @@ namespace TraderLauncher
             
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "git";
-            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git";
+            psi.Arguments = "clone https://github.com/aleksanchez0311/coinex_trader.git .";
             psi.WorkingDirectory = appDataDir;
             psi.CreateNoWindow = true;
             psi.UseShellExecute = false;

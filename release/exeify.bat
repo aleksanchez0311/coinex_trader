@@ -45,7 +45,7 @@ goto compile
 
 :gen_icon
 echo favicon.ico no encontrado, generando icono...
-call release\iconify
+call iconify.bat
 if not exist "favicon.ico" goto icon_error
 
 :compile

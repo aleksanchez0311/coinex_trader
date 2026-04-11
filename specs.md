@@ -133,8 +133,8 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - lucide-react
 
 ### Launcher (Windows)
-- exeify (build script)
-- iconify (icon generator)
+- exeify.bat (build script)
+- iconify.bat (icon generator)
 - exeify.cs (C# source)
 
 ## 🖥️ Launcher Windows
@@ -142,7 +142,7 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 ### Compilación
 ```cmd
 cd release
-./exeify
+exeify.bat
 ```
 Genera `CoinExTrader.exe` + `favicon.ico`
 

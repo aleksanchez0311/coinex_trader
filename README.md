@@ -143,7 +143,7 @@ El launcher descarga el proyecto desde GitHub, instala dependencias y ejecuta au
 
 ```cmd
 cd release
-./exeify
+exeify.bat
 ```
 
 Genera `CoinExTrader.exe` + `favicon.ico`
@@ -151,9 +151,9 @@ Genera `CoinExTrader.exe` + `favicon.ico`
 ### Requisitos previos
 
 1. **.NET Framework 4.x** (incluido en Windows 10/11)
-2. **Git**インストール
-3. **Python**インストール
-4. **Node.js**インストール
+2. **Git**
+3. **Python**
+4. **Node.js**
 
 ### Uso
 

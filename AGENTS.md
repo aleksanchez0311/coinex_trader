@@ -20,8 +20,8 @@ trader/
 │       │   └── components/      # UI components
 │       └── package.json
 ├── release/                      # Windows executable
-│   ├── exeify                  # Build script
-│   ├── iconify                 # Icon generator
+│   ├── exeify.bat              # Build script
+│   ├── iconify.bat             # Icon generator
 │   └── exeify.cs               # Launcher source
 ├── CoinExTrader.exe             # Compiled executable
 ├── favicon.ico                  # Application icon
@@ -52,8 +52,8 @@ trader/
 - `app/web/src/components/RiskManagementView.jsx` - Risk management view
 
 ### Launcher
-- `release/exeify` - Build executable script
-- `release/iconify` - Icon generator
+- `release/exeify.bat` - Build executable script
+- `release/iconify.bat` - Icon generator
 - `release/exeify.cs` - C# launcher code
 
 ## Commands
@@ -66,10 +66,10 @@ cd app/backend && python main.py
 cd app/web && npm run dev
 
 # Build executable (Windows)
-cd release && ./exeify
+cd release && exeify.bat
 
 # Launcher completo (instala todo y ejecuta)
-./exeify
+release\exeify.bat
 ```
 
 ## Configuration
