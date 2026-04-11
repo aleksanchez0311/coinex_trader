@@ -20,7 +20,7 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
 
   const fetchMarkets = async () => {
     try {
-      const response = await fetch('http://localhost:8000/markets');
+      const response = await fetch('http://localhost:8000/top-gainers?limit=100&sort_by=volume&verified_only=true');
       const data = await response.json();
       if (Array.isArray(data)) setAllMarkets(data);
     } catch (error) {
@@ -30,7 +30,7 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
 
   const fetchTopGainers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/top-gainers?limit=30');
+      const response = await fetch('http://localhost:8000/top-gainers?limit=30&verified_only=true');
       const data = await response.json();
       if (Array.isArray(data)) setTopGainers(data);
     } catch (error) {

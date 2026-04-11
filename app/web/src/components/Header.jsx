@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bell, Search, User, ChevronDown } from 'lucide-react';
+import { Bell, Search, User, ChevronDown, RefreshCw } from 'lucide-react';
 
-const Header = ({ pnlStats }) => {
+const Header = ({ pnlStats, pnlLoading }) => {
   return (
     <header className="h-20 border-b border-border px-8 flex items-center justify-between bg-surface/20 backdrop-blur-xl sticky top-0 z-10">
       <div className="flex items-center gap-6">
@@ -18,9 +18,13 @@ const Header = ({ pnlStats }) => {
             (pnlStats?.total_pnl || 0) >= 0 ? 'bg-long/10 border-long/20 text-long' : 'bg-short/10 border-short/20 text-short'
           }`}>
             <span className="text-[9px] font-bold uppercase tracking-wider">PnL Acumulado:</span>
-            <span className="text-xs font-mono font-bold">
-              {(pnlStats?.total_pnl || 0) >= 0 ? '+' : ''}{(pnlStats?.total_pnl || 0).toFixed(2)} USDT
-            </span>
+            {pnlLoading ? (
+              <RefreshCw size={12} className="animate-spin text-accent" />
+            ) : (
+              <span className="text-xs font-mono font-bold">
+                {(pnlStats?.total_pnl || 0) >= 0 ? '+' : ''}{(pnlStats?.total_pnl || 0).toFixed(2)} USDT
+              </span>
+            )}
           </div>
         </div>
       </div>

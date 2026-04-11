@@ -47,6 +47,11 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - **Leverage**: 1-125x
 - **Endpoint**: `fetch_positions()`, `create_order()`, `fetch_my_trades()`
 
+### OKX (Market Data)
+- **Datos de Mercado**: OHLCV, tickers, mercados disponibles
+- **Verificación**: Cross-check de mercados con CoinEx
+- **Timeframe**: 1h (200 velas)
+
 ### Datos de Mercado
 - OHLCV: 200 velas timeframe 1h
 - Ticker: Precio actual + cambio 24h
@@ -124,6 +129,10 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - numpy
 - ccxt
 - pydantic
+- python-dotenv
+- scipy
+- cairosvg
+- pillow
 
 ### Frontend
 - react
@@ -131,11 +140,16 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - tailwindcss
 - framer-motion
 - lucide-react
+- axios
+- lightweight-charts
+- clsx
+- tailwind-merge
 
 ### Launcher (Windows)
 - exeify.bat (build script)
 - iconify.bat (icon generator)
 - exeify.cs (C# source)
+- .NET Framework 4.x (build runtime)
 
 ## 🖥️ Launcher Windows
 

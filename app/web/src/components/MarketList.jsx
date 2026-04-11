@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Clock, Search, X, Calculator, Play } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, Search, X, Calculator, Play, RefreshCw } from 'lucide-react';
 
 const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
   const [favorites, setFavorites] = useState(() => {
@@ -7,6 +7,7 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
     const defaultSymbols = saved ? JSON.parse(saved) : [];
     return defaultSymbols.map(sym => ({ symbol: sym, price: null, change: null, up: true }));
   });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
 
@@ -33,6 +34,7 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
   const loadPrices = async () => {
     const symbols = favorites.map(f => f.symbol);
     if(symbols.length === 0) return;
+    setLoading(true);
     try {
       const response = await fetch('http://localhost:8000/tickers', {
         method: 'POST',
@@ -56,6 +58,8 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
       }
     } catch (error) {
       console.error("Error fetching tickers:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -103,7 +107,17 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
         <h3 className="font-bold flex items-center gap-2">
           <Clock size={16} className="text-accent" /> Favoritos
         </h3>
-        <span className="text-[10px] text-gray-500 font-bold uppercase">Cambio 24h</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-500 font-bold uppercase">Cambio 24h</span>
+          <button 
+            onClick={loadPrices}
+            disabled={loading}
+            className="p-1 hover:bg-white/10 rounded-md transition-colors disabled:opacity-50"
+            title="Refrescar precios"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin text-accent" : "text-gray-400"} />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3 overflow-y-auto max-h-[350px] pr-2">

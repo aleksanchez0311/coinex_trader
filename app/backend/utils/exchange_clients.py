@@ -1,15 +1,17 @@
 import ccxt
 import os
 import time
-from typing import Dict
+from typing import Dict, List
 
 
 class MarketDataClient:
-    """Cliente para datos de mercado vía OKX (OHLCV, tickers, derivados)"""
+    """Cliente para datos de mercado y análisis - EXCLUSIVAMENTE OKX"""
 
     def __init__(self):
         self.client = ccxt.okx({"enableRateLimit": True})
         self.client.options["defaultType"] = "swap"
+        self._okx_markets_cache = None
+        self._cache_time = 0
 
     def _normalize_symbol(self, symbol: str) -> str:
         """Normaliza símbolo al formato base OKX (SYM/USDT)"""
@@ -18,8 +20,64 @@ class MarketDataClient:
             sym = sym.replace("USDT", "/USDT")
         return sym
 
+    def _get_okx_markets(self) -> set:
+        """Obtiene lista de mercados disponibles en OKX (~582 USDT) con cache"""
+        now = time.time()
+        if self._okx_markets_cache and (now - self._cache_time) < 300:
+            return self._okx_markets_cache
+
+        try:
+            okx = ccxt.okx({"enableRateLimit": True})
+            okx.options["defaultType"] = "swap"
+            markets = okx.load_markets()
+            verified = set(
+                s.replace("/USDT", "USDT")
+                for s in markets.keys()
+                if "/USDT" in s and markets[s].get("active")
+            )
+            self._okx_markets_cache = verified
+            self._cache_time = now
+            return verified
+        except Exception as e:
+            return self._get_fallback_markets()
+
+    def _get_fallback_markets(self) -> set:
+        """Fallback con monedas principales"""
+        return {
+            "BTCUSDT",
+            "ETHUSDT",
+            "BNBUSDT",
+            "SOLUSDT",
+            "XRPUSDT",
+            "ADAUSDT",
+            "DOGEUSDT",
+            "AVAXUSDT",
+            "DOTUSDT",
+            "MATICUSDT",
+            "LINKUSDT",
+            "LTCUSDT",
+            "UNIUSDT",
+            "ATOMUSDT",
+            "ETCUSDT",
+            "XLMUSDT",
+            "NEARUSDT",
+            "APTUSDT",
+            "FILUSDT",
+            "ARBUSDT",
+            "OPUSDT",
+            "AAVEUSDT",
+            "VETUSDT",
+            "ICPUSDT",
+            "ALGOUSDT",
+            "SANDUSDT",
+            "MANAUSDT",
+            "AXSUSDT",
+            "EOSUSDT",
+            "THETAUSDT",
+        }
+
     def get_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 200):
-        """Obtiene OHLCV desde OKX (más rápido que CoinEx)"""
+        """Obtiene OHLCV desde OKX"""
         try:
             sym = self._normalize_symbol(symbol)
             ohlcv = self.client.fetch_ohlcv(sym, timeframe, limit=limit)
@@ -38,39 +96,6 @@ class MarketDataClient:
                 "percentage": ticker.get("percentage"),
                 "up": ticker.get("last", 0) > ticker.get("open", 0),
             }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def get_top_gainers(self, limit: int = 20):
-        """Obtiene los pares con mayor rendimiento (ganadores 24h)"""
-        try:
-            tickers = self.client.fetch_tickers()
-            valid_tickers = []
-            
-            for sym, ticker in tickers.items():
-                pct = ticker.get("percentage")
-                # Filtramos para enfocarnos en pares basados en USDT y con data válida
-                if pct is not None and "USDT" in sym and "-USDC" not in sym:
-                    clean_sym = self._normalize_symbol(sym)
-                    
-                    # Filtro contra apalancados y stablecoins irrelevantes
-                    if clean_sym.split('/')[0] not in ['USDC', 'DAI', 'TUSD']:
-                        valid_tickers.append({
-                            "symbol": clean_sym,
-                            "base": clean_sym.split('/')[0] if '/' in clean_sym else clean_sym,
-                            "quote": "USDT",
-                            "percentage": pct,
-                            "last": ticker.get("last"),
-                            "up": ticker.get("last", 0) > ticker.get("open", 0)
-                        })
-                    
-            # Eliminar duplicados para seguridad
-            unique_tickers = {t["symbol"]: t for t in valid_tickers}
-            valid_tickers = list(unique_tickers.values())
-            
-            # Ordenar de mayor a menor porcentaje
-            valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
-            return valid_tickers[:limit]
         except Exception as e:
             return {"error": str(e)}
 
@@ -105,9 +130,93 @@ class MarketDataClient:
 
         return result
 
+    def get_all_markets(self, verified_only: bool = False) -> List[Dict]:
+        """
+        Obtiene todos los mercados de futuros disponibles en OKX.
+        Si verified_only=True, filtra solo mercados activos.
+        """
+        try:
+            self.client.load_markets()
+            markets = []
+            for sym, market in self.client.markets.items():
+                if "/USDT" not in sym:
+                    continue
+                if verified_only and not market.get("active"):
+                    continue
+                base, quote = sym.split("/")
+                markets.append(
+                    {
+                        "symbol": sym,
+                        "base": base,
+                        "quote": quote,
+                        "active": market.get("active", False),
+                    }
+                )
+            markets.sort(key=lambda x: x["base"])
+            return markets
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_top_markets(self, limit: int = 30, sort_by: str = "change") -> List[Dict]:
+        """
+        Obtiene los mejores mercados ordenados por capitalización o cambio 24h.
+        sort_by: 'change' (top gainers 24h), 'volume', 'oi' (open interest)
+        """
+        import requests
+
+        try:
+            resp = requests.get(
+                "https://api.okx.com/api/v5/market/tickers?instType=SWAP"
+            )
+            data = resp.json()
+            if data.get("code") != "0":
+                raise Exception(f"OKX API error: {data}")
+
+            tickers = data.get("data", [])
+            valid_tickers = []
+
+            for t in tickers:
+                sym = t.get("instId", "")
+                if not sym.endswith("-USDT-SWAP"):
+                    continue
+
+                base = sym.replace("-USDT-SWAP", "")
+                open_price = float(t.get("open24h", 0) or 0)
+                last_price = float(t.get("last", 0) or 0)
+
+                if open_price <= 0:
+                    continue
+
+                pct = ((last_price - open_price) / open_price) * 100
+
+                val = {
+                    "symbol": f"{base}/USDT",
+                    "base": base,
+                    "quote": "USDT",
+                    "percentage": pct,
+                    "last": last_price,
+                    "up": last_price > open_price,
+                    "volume": float(t.get("vol24h", 0) or 0),
+                    "open_interest": float(t.get("openInterest", 0) or 0),
+                }
+                valid_tickers.append(val)
+
+            if sort_by == "change":
+                valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
+            elif sort_by == "volume":
+                valid_tickers.sort(key=lambda x: x["volume"], reverse=True)
+            elif sort_by == "oi":
+                valid_tickers.sort(key=lambda x: x["open_interest"], reverse=True)
+            else:
+                valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
+
+            return valid_tickers[:limit]
+        except Exception as e:
+            return {"error": str(e)}
+
 
 class TradingClient:
-    """Cliente de ejecución de órdenes en CoinEx (futuros/swap)"""
+    """Cliente de ejecución de órdenes - EXCLUSIVAMENTE COINEX"""
 
     def __init__(self, api_key: str = None, secret: str = None):
         self.api_key = api_key or os.getenv("COINEX_API_KEY")
@@ -123,6 +232,20 @@ class TradingClient:
         self.client.options["defaultType"] = "swap"
         self.client.options["createMarketBuyOrderRequiresPrice"] = False
         self.client.options["defaultMarginMode"] = "isolated"
+
+    def _get_okx_verified_markets(self) -> set:
+        """Obtiene mercados verificados desde OKX para cross-check"""
+        try:
+            okx = ccxt.okx({"enableRateLimit": True})
+            okx.options["defaultType"] = "swap"
+            markets = okx.load_markets()
+            return set(
+                s.replace("/USDT", "USDT")
+                for s in markets.keys()
+                if "/USDT" in s and markets[s].get("active")
+            )
+        except Exception as e:
+            return set()
 
     def set_leverage(self, symbol: str, leverage: int, margin_mode: str = "isolated"):
         """Configura el apalancamiento y modo de margen para el símbolo"""
@@ -149,10 +272,7 @@ class TradingClient:
         margin_mode: str = "isolated",
         order_type: str = "limit",
     ) -> Dict:
-        """
-        Crea una orden con SL y TP automáticos en modo aislado.
-        order_type: 'limit' o 'market'
-        """
+        """Crea una orden con SL y TP automáticos en modo aislado."""
         if ":" not in symbol:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
@@ -209,7 +329,6 @@ class TradingClient:
         except Exception as e:
             return {"error": str(e)}
 
-
     def execute_order(
         self,
         symbol: str,
@@ -220,11 +339,9 @@ class TradingClient:
     ):
         """Ejecuta orden en CoinEx (LIVE)"""
 
-        # Para Futuros en CCXT/CoinEx, el símbolo ideal es SYMBOL/CURRENCY:CURRENCY
         if ":" not in symbol:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
-        # Ajustar precisión del amount según el mercado
         try:
             self.client.load_markets()
             if symbol not in self.client.markets:
@@ -242,7 +359,7 @@ class TradingClient:
 
             amount = float(self.client.amount_to_precision(symbol, amount))
         except Exception as e:
-            print(f"Error ajustando precisión o cargando mercados: {e}")
+            pass
 
         try:
             if order_type == "market":
@@ -264,7 +381,6 @@ class TradingClient:
         """Obtiene las posiciones abiertas reales"""
         try:
             positions = self.client.fetch_positions()
-            # Filtrar solo posiciones con tamaño > 0
             return [
                 p
                 for p in positions
@@ -276,8 +392,6 @@ class TradingClient:
     def close_position(self, symbol: str, side: str, amount: float):
         """Cierra una posición abriendo la orden contraria"""
         try:
-            # Si la posición es 'long', cerramos con un 'sell'
-            # Si es 'short', cerramos con un 'buy'
             opposite_side = "sell" if side.lower() == "long" else "buy"
             return self.execute_order(
                 symbol, opposite_side, amount, order_type="market"
@@ -285,46 +399,145 @@ class TradingClient:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_all_markets(self):
-        """Obtiene todos los mercados de futuros disponibles"""
+    def get_all_markets(self, verified_only: bool = False) -> List[Dict]:
+        """
+        Obtiene todos los mercados de futuros disponibles en CoinEx.
+        Si verified_only=True, filtra usando OKX como referencia.
+        """
+        import requests
+
         try:
-            self.client.load_markets()
+            verified_markets = (
+                self._get_okx_verified_markets() if verified_only else set()
+            )
+
+            resp = requests.get("https://api.coinex.com/v2/futures/market")
+            data = resp.json()
+            if data.get("code") != 0:
+                raise Exception(f"API error: {data}")
+
             markets = []
-            for symbol, market in self.client.markets.items():
-                if market.get("swap"):
-                    markets.append(
-                        {
-                            "symbol": symbol,
-                            "base": market["base"],
-                            "quote": market["quote"],
-                            "active": market["active"],
-                        }
-                    )
+            for market in data["data"]:
+                sym = market["market"]
+                if sym.endswith("USDT"):
+                    symbol = f"{sym[:-4]}/USDT"
+                    base = sym[:-4]
+                    quote = "USDT"
+                elif sym.endswith("USDC"):
+                    symbol = f"{sym[:-4]}/USDC"
+                    base = sym[:-4]
+                    quote = "USDC"
+                else:
+                    symbol = sym
+                    base = sym
+                    quote = ""
+
+                if verified_only and sym not in verified_markets:
+                    continue
+
+                markets.append(
+                    {"symbol": symbol, "base": base, "quote": quote, "active": True}
+                )
             return markets
         except Exception as e:
             return {"error": str(e)}
 
-    def get_realized_pnl(self, limit=50):
-        """Obtiene el PnL total: realizado + no realizado + fees"""
+    def get_top_markets(
+        self, limit: int = 30, sort_by: str = "change", verified_only: bool = False
+    ) -> List[Dict]:
+        """
+        Obtiene los mejores mercados ordenados desde CoinEx.
+        sort_by: 'change' (top gainers 24h), 'volume', 'oi', 'value'
+        Si verified_only=True, filtra usando OKX como referencia.
+        """
+        import requests
 
+        try:
+            verified_markets = (
+                self._get_okx_verified_markets() if verified_only else set()
+            )
+
+            resp = requests.get("https://api.coinex.com/v2/futures/ticker")
+            data = resp.json()
+            if data.get("code") != 0:
+                raise Exception(f"API error: {data}")
+
+            tickers = data["data"]
+            valid_tickers = []
+
+            for m in tickers:
+                sym = m["market"]
+                if not sym.endswith("USDT"):
+                    continue
+
+                if verified_only and sym not in verified_markets:
+                    continue
+
+                open_price = float(m["open"])
+                last_price = float(m["last"])
+
+                if open_price <= 0:
+                    continue
+
+                pct = ((last_price - open_price) / open_price) * 100
+
+                clean_sym = f"{sym[:-4]}/USDT"
+                base = sym[:-4]
+
+                if base in ["USDC", "DAI", "TUSD"]:
+                    continue
+
+                val = {
+                    "symbol": clean_sym,
+                    "base": base,
+                    "quote": "USDT",
+                    "percentage": pct,
+                    "last": last_price,
+                    "up": last_price > open_price,
+                    "volume": float(m["volume"]),
+                    "open_interest": float(m.get("open_interest_volume", 0)),
+                    "value": float(m.get("value", 0)),
+                    "trades": float(m.get("volume_buy", 0))
+                    + float(m.get("volume_sell", 0)),
+                }
+                valid_tickers.append(val)
+
+            if sort_by == "change":
+                valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
+            elif sort_by == "volume":
+                valid_tickers.sort(key=lambda x: x["volume"], reverse=True)
+            elif sort_by == "oi":
+                valid_tickers.sort(key=lambda x: x["open_interest"], reverse=True)
+            elif sort_by == "value":
+                valid_tickers.sort(key=lambda x: x["value"], reverse=True)
+            elif sort_by == "trades":
+                valid_tickers.sort(key=lambda x: x["trades"], reverse=True)
+            else:
+                valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
+
+            return valid_tickers[:limit]
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_realized_pnl(self, limit: int = 50) -> Dict:
+        """Obtiene el PnL total: realizado + no realizado + fees"""
         try:
             total_pnl = 0.0
             realized_pnl = 0.0
             unrealized_pnl = 0.0
             total_fees = 0.0
             pnl_records = []
+            positions = []
 
-            # 1. Obtener posiciones actuales (unrealized PnL)
             try:
                 positions = self.client.fetch_positions()
                 for pos in positions:
                     if pos.get("contracts", 0) > 0:
                         un_pnl = float(pos.get("unrealizedPnl", 0) or 0)
                         unrealized_pnl += un_pnl
-            except Exception as e:
-                print(f"Error fetching positions: {e}")
+            except Exception:
+                pass
 
-            # 2. Obtener trades cerrados (realized PnL + fees)
             try:
                 symbols = list(
                     set([p.get("symbol") for p in positions if p.get("symbol")])
@@ -353,10 +566,9 @@ class TradingClient:
                                 )
                     except:
                         pass
-            except Exception as e:
-                print(f"Error fetching trades: {e}")
+            except Exception:
+                pass
 
-            # PnL total = realizado + no realizado - fees
             total_pnl = realized_pnl + unrealized_pnl - total_fees
 
             return {
@@ -369,5 +581,3 @@ class TradingClient:
             }
         except Exception as e:
             return {"error": str(e)}
-
-

@@ -26,7 +26,6 @@ market_client = MarketDataClient()
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(req, exc):
-    print(f"DEBUG: 422 Validation Error: {exc.errors()}")
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors(), "body": exc.body},
@@ -97,16 +96,13 @@ async def analyze_pair(req: AnalysisRequest):
 
 @app.post("/risk-management")
 async def calculate_risk(req: RiskRequest):
-    print(f"DEBUG: Risk Management Request: {req}")
     risk_engine = RiskEngine()
     pos_data = risk_engine.calculate_position(
         req.capital, req.risk_pct, req.entry_price, req.stop_loss, req.leverage
     )
 
-    # Determinar sesgo implícito basándose en entry vs SL
     bias = "Alcista" if req.entry_price > req.stop_loss else "Bajista"
 
-    # Usar TP proporcionado o generar automáticamente
     if req.take_profit:
         plan = {
             "entry": req.entry_price,
@@ -128,7 +124,6 @@ async def calculate_risk(req: RiskRequest):
 
 @app.post("/execute-trade")
 async def execute_trade(req: TradeExecutionRequest):
-    print(f"DEBUG: Trade Execution Request: {req}")
     client = TradingClient(api_key=req.api_key, secret=req.secret)
 
     result = client.create_order_with_sl_tp(
@@ -144,10 +139,8 @@ async def execute_trade(req: TradeExecutionRequest):
     )
 
     if "error" in result:
-        print(f"DEBUG: Trade Execution Error: {result['error']}")
         raise HTTPException(status_code=400, detail=result["error"])
 
-    print(f"DEBUG: Trade Execution Success: {result}")
     return result
 
 
@@ -218,21 +211,36 @@ async def get_pnl_stats(req: Dict = Body(...)):
 
 
 @app.get("/markets")
-async def get_all_markets():
-    """Obtiene todos los pares disponibles para futuros"""
-    client = TradingClient()
-    markets = client.get_all_markets()
+async def get_all_markets(verified_only: bool = False, sort_by: str = "symbol"):
+    """Obtiene todos los pares disponibles para futuros.
+    Si verified_only=True, filtra solo los mercados disponibles en OKX.
+    sort_by: 'symbol' (alfabético), 'volume' (capitalización), 'oi' (open interest)"""
+    trading_client = TradingClient()
+    markets = trading_client.get_all_markets(verified_only=verified_only)
 
     if isinstance(markets, dict) and "error" in markets:
         raise HTTPException(status_code=400, detail=markets["error"])
+
+    if sort_by == "volume":
+        markets.sort(key=lambda x: x.get("volume", 0), reverse=True)
+    elif sort_by == "oi":
+        markets.sort(key=lambda x: x.get("open_interest", 0), reverse=True)
+    else:
+        markets.sort(key=lambda x: x.get("base", ""))
 
     return markets
 
 
 @app.get("/top-gainers")
-async def get_top_gainers_endpoint(limit: int = 20):
-    """Obtiene el top de monedas con mayor porcentaje de crecimiento 24h"""
-    gainers = market_client.get_top_gainers(limit=limit)
+async def get_top_gainers_endpoint(
+    limit: int = 20, sort_by: str = "change", verified_only: bool = False
+):
+    """Obtiene el top de monedas segun criterio (por defecto: crecimiento 24h).
+    Si verified_only=True, filtra solo los mercados disponibles en OKX."""
+    client = TradingClient()
+    gainers = client.get_top_markets(
+        limit=limit, sort_by=sort_by, verified_only=verified_only
+    )
 
     if isinstance(gainers, dict) and "error" in gainers:
         raise HTTPException(status_code=400, detail=gainers["error"])

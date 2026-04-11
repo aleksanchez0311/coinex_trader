@@ -25,6 +25,7 @@ trader/
 ├── app/                          # Aplicación
 │   ├── backend/                  # FastAPI (Python)
 │   │   ├── main.py               # Endpoints API
+│   │   ├── requirements.txt      # Dependencias Python
 │   │   ├── engines/
 │   │   │   ├── analysis.py       # Motor de análisis SMC
 │   │   │   ├── scoring.py        # Scoring de setups
@@ -35,15 +36,33 @@ trader/
 │   │       └── exchange_clients.py # Clientes CoinEx/OKX (CCXT)
 │   └── web/                      # React + Vite
 │       ├── src/
-│       │   ├── components/       # Componentes UI
+│       │   ├── main.jsx          # Entry point React
+│       │   ├── index.css         # Estilos Tailwind
+│       │   ├── App.css           # Estilos globales
 │       │   ├── App.jsx           # Componente principal
-│       │   └── index.css         # Estilos Tailwind
+│       │   ├── components/       # Componentes UI
+│       │   │   ├── MarketList.jsx
+│       │   │   ├── AnalysisBoard.jsx
+│       │   │   ├── PositionsTable.jsx
+│       │   │   ├── Sidebar.jsx
+│       │   │   ├── Header.jsx
+│       │   │   ├── SettingsView.jsx
+│       │   │   ├── StrategyView.jsx
+│       │   │   ├── RiskManagementView.jsx
+│       │   │   └── RiskPanel.jsx
+│       │   └── assets/          # Recursos (SVG, imágenes)
+│       ├── public/
+│       │   ├── index.html       # HTML template
+│       │   └── favicon.svg      # Icono
 │       ├── package.json
-│       └── tailwind.config.js
+│       ├── tailwind.config.js
+│       ├── vite.config.js
+│       ├── postcss.config.js
+│       └── eslint.config.js
 ├── release/                      # Launcher Windows
-│   ├── exeify                    # Script de compilación
-│   ├── iconify                   # Generador de icono
-│   └── exeify.cs                 # Código fuente
+│   ├── exeify.bat              # Script de compilación
+│   ├── iconify.bat             # Generador de icono
+│   └── exeify.cs               # Código fuente C#
 ├── CoinExTrader.exe              # Ejecutable compilado
 ├── favicon.ico                   # Icono de la aplicación
 ├── .env.example                  # Variables de entorno ejemplo
@@ -64,6 +83,18 @@ python main.py
 
 El servidor correrá en `http://localhost:8000`
 
+Dependencias:
+- fastapi
+- uvicorn
+- pandas
+- numpy
+- ccxt
+- pydantic
+- python-dotenv
+- scipy
+- cairosvg
+- pillow
+
 ### Frontend
 
 ```bash
@@ -73,6 +104,17 @@ npm run dev
 ```
 
 La aplicación estará en `http://localhost:5173`
+
+Dependencias:
+- react
+- vite
+- tailwindcss
+- framer-motion
+- lucide-react
+- axios
+- lightweight-charts
+- clsx
+- tailwind-merge
 
 ## ⚙️ Configuración
 

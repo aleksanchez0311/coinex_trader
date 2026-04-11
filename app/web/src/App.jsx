@@ -17,6 +17,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisStep, setAnalysisStep] = useState('');
   const [pnlStats, setPnlStats] = useState({ total_pnl: 0, count: 0 });
+  const [pnlLoading, setPnlLoading] = useState(false);
   
   // Estado para Risk Management
   const [capital, setCapital] = useState(100);
@@ -42,6 +43,7 @@ const App = () => {
       console.log("No credentials, skipping PnL fetch");
       return;
     }
+    setPnlLoading(true);
     try {
       const response = await fetch('http://localhost:8000/pnl-stats', {
         method: 'POST',
@@ -60,6 +62,8 @@ const App = () => {
       if (data && !data.error) setPnlStats(data);
     } catch (e) {
       console.error("Error fetching PnL stats:", e);
+    } finally {
+      setPnlLoading(false);
     }
   };
 
@@ -283,7 +287,7 @@ const App = () => {
       />
       
       <main className="flex-1 flex flex-col min-w-0">
-        <Header pnlStats={pnlStats} />
+        <Header pnlStats={pnlStats} pnlLoading={pnlLoading} />
         
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'dashboard' && (

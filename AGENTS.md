@@ -11,14 +11,24 @@ trader/
 ├── app/                          # Aplicacion principal
 │   ├── backend/                  # FastAPI (Python)
 │   │   ├── main.py               # API endpoints
+│   │   ├── requirements.txt      # Python dependencies
 │   │   ├── engines/              # Analysis, scoring, risk engines
 │   │   ├── models/              # Pydantic models
-│   │   └── utils/               # CoinEx client
+│   │   ├── utils/               # Exchange clients
+│   │   │   └── exchange_clients.py
 │   └── web/                      # React + Vite
 │       ├── src/
+│       │   ├── main.jsx          # Entry point
+│       │   ├── index.css         # Tailwind styles
+│       │   ├── App.css          # Global styles
 │       │   ├── App.jsx          # Main app component
 │       │   └── components/      # UI components
-│       └── package.json
+│       ├── public/
+│       ├── package.json
+│       ├── tailwind.config.js
+│       ├── vite.config.js
+│       ├── postcss.config.js
+│       └── eslint.config.js
 ├── release/                      # Windows executable
 │   ├── exeify.bat              # Build script
 │   ├── iconify.bat             # Icon generator
@@ -50,6 +60,7 @@ trader/
 - `app/web/src/components/SettingsView.jsx` - API Config and Favorite Markets Manager
 - `app/web/src/components/StrategyView.jsx` - Strategy display
 - `app/web/src/components/RiskManagementView.jsx` - Risk management view
+- `app/web/src/components/RiskPanel.jsx` - Risk panel component
 
 
 ### Launcher
@@ -91,5 +102,4 @@ cd app/web && npm run lint
 
 ## Known Issues
 
-- RiskPanel component has unused isLive references
-- LSP type errors in coinex_client.py (non-blocking)
+- None currently
