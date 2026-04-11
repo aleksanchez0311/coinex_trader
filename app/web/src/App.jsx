@@ -14,6 +14,7 @@ const App = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
   const [analysisData, setAnalysisData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState('');
   const [pnlStats, setPnlStats] = useState({ total_pnl: 0, count: 0 });
   
   // Estado para Risk Management
@@ -85,6 +86,7 @@ const App = () => {
 
   const fetchAnalysis = async (symbol) => {
     setIsLoading(true);
+    setAnalysisStep(`Descargando datos OHLCV de ${symbol}...`);
     try {
       const response = await fetch('http://localhost:8000/analyze', {
         method: 'POST',
@@ -95,12 +97,17 @@ const App = () => {
           secret: credentials.apiSecret
         })
       });
+      
+      setAnalysisStep('Analizando estructura SMC...');
       const data = await response.json();
+      
+      setAnalysisStep('Calculando indicadores...');
       setAnalysisData(data);
     } catch (error) {
       console.error("Error fetching analysis:", error);
     } finally {
       setIsLoading(false);
+      setAnalysisStep('');
     }
   };
 
@@ -301,6 +308,7 @@ const App = () => {
                     symbol={selectedSymbol} 
                     data={analysisData} 
                     loading={isLoading}
+                    analysisStep={analysisStep}
                   />
                 </div>
               </div>

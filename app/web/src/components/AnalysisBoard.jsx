@@ -2,7 +2,7 @@ import React from 'react';
 import { Target, Activity, Zap, Info, BarChart3, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const AnalysisBoard = ({ symbol, data, loading }) => {
+const AnalysisBoard = ({ symbol, data, loading, analysisStep }) => {
   if (loading) return (
     <div className="glass p-10 flex flex-col items-center justify-center gap-4 min-h-[500px]">
       <motion.div 
@@ -11,6 +11,9 @@ const AnalysisBoard = ({ symbol, data, loading }) => {
         className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full"
       ></motion.div>
       <p className="text-accent animate-pulse font-bold tracking-widest uppercase text-xs">Analizando mercado...</p>
+      {analysisStep && (
+        <p className="text-gray-500 text-[10px] mt-2">{analysisStep}</p>
+      )}
     </div>
   );
 
@@ -235,6 +238,43 @@ const AnalysisBoard = ({ symbol, data, loading }) => {
           <div className="flex gap-6 mt-2 text-[10px] text-gray-400">
             <span>Ratio: {analysis.volume.ratio}</span>
             <span>Promedio: {analysis.volume.avg_volume}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Derivatives / Funding Rate */}
+      {data?.derivatives?.funding && (
+        <div className="glass p-4 border-accent/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity size={14} className="text-accent" />
+            <span className="text-xs font-bold text-gray-500 uppercase">Datos de Derivados (CoinEx)</span>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-[10px] text-gray-500">Funding Rate</p>
+              <p className={`text-lg font-mono ${data.derivatives.funding.current > 0 ? 'text-short' : data.derivatives.funding.current < 0 ? 'text-long' : 'text-gray-400'}`}>
+                {data.derivatives.funding.current > 0 ? '+' : ''}{(data.derivatives.funding.current * 100).toFixed(4)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-500">Next Funding</p>
+              <p className={`text-lg font-mono ${data.derivatives.funding.next > 0 ? 'text-short' : data.derivatives.funding.next < 0 ? 'text-long' : 'text-gray-400'}`}>
+                {data.derivatives.funding.next > 0 ? '+' : ''}{(data.derivatives.funding.next * 100).toFixed(4)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-500">Mark Price</p>
+              <p className="text-lg font-mono">${data.derivatives.funding.mark_price?.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-border/30">
+            <p className="text-[10px] text-gray-500">
+              {data.derivatives.funding.current > 0 
+                ? 'Longs pagan - Sesgo hacia cortos' 
+                : data.derivatives.funding.current < 0 
+                  ? 'Shorts pagan - Sesgo hacia largos' 
+                  : 'Funding neutro - Sin sesgo claro'}
+            </p>
           </div>
         </div>
       )}
