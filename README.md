@@ -41,9 +41,9 @@ trader/
 │       ├── package.json
 │       └── tailwind.config.js
 ├── release/                      # Launcher Windows
-│   ├── build.bat                 # Script de compilación
-│   ├── create_icon.bat           # Generador de icono
-│   └── launcher.cs               # Código fuente
+│   ├── exeify                    # Script de compilación
+│   ├── iconify                   # Generador de icono
+│   └── exeify.cs                 # Código fuente
 ├── CoinExTrader.exe              # Ejecutable compilado
 ├── favicon.ico                   # Icono de la aplicación
 ├── .env.example                  # Variables de entorno ejemplo
@@ -143,7 +143,7 @@ El launcher descarga el proyecto desde GitHub, instala dependencias y ejecuta au
 
 ```cmd
 cd release
-create_exe.bat
+./exeify
 ```
 
 Genera `CoinExTrader.exe` + `favicon.ico`

@@ -133,16 +133,16 @@ Plataforma fullstack para análisis y ejecución de trading intradía en criptom
 - lucide-react
 
 ### Launcher (Windows)
-- .NET Framework 4.x
-- C# (compilador csc.exe)
-- Git, Python, Node.js (runtime)
+- exeify (build script)
+- iconify (icon generator)
+- exeify.cs (C# source)
 
 ## 🖥️ Launcher Windows
 
 ### Compilación
 ```cmd
 cd release
-create_exe.bat
+./exeify
 ```
 Genera `CoinExTrader.exe` + `favicon.ico`
 
