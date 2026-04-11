@@ -147,16 +147,19 @@ const App = () => {
       
       const data = await response.json();
       console.log(">>> Risk result received:", data);
+      console.log(">>> plan.tp1:", data.plan?.tp1);
+      console.log(">>> current tpPrice state:", tpPrice);
       
       if (data.error) {
         alert(`Error: ${data.error}`);
         return;
       }
-      
+
       console.log(">>> Actualizando riskResult state...");
       setRiskResult(data);
       
-      if (data.plan?.tp1 && tpPrice === 0) {
+      if (data.plan?.tp1) {
+        console.log(">>> Setting tpPrice to:", data.plan.tp1);
         setTpPrice(data.plan.tp1);
       }
       
@@ -206,6 +209,13 @@ const App = () => {
   useEffect(() => {
     if (selectedSymbol) {
       fetchAnalysis(selectedSymbol);
+      setTpPrice(0);
+      setSlPrice(0);
+      setRiskResult(null);
+      setCapital(100);
+      setRiskPct(1);
+      setLeverage(10);
+      setEntryPrice(null);
     }
   }, [selectedSymbol]);
 
@@ -419,6 +429,16 @@ const App = () => {
                   onChange={(e) => setEntryPrice(Number(e.target.value))}
                   className="bg-surface border border-border rounded px-2 py-0.5 text-white font-mono text-xs w-28 text-right"
                 />
+              </div>
+              <div className="flex justify-between py-1 border-b border-border">
+                <span className="text-gray-400">Entrada Sugerida:</span>
+                <span className="font-mono text-green-400">${analysisData?.analysis?.last_price?.toLocaleString() || '---'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-border">
+                <span className="text-gray-400">Zonas de Entrada:</span>
+                <span className="font-mono text-yellow-400 text-xs">
+                  {analysisData?.analysis?.entry_zones?.map(z => z.toFixed(2)).join(' / ') || '---'}
+                </span>
               </div>
               <div className="flex justify-between py-1 border-b border-border">
                 <span className="text-gray-400">Stop Loss:</span>

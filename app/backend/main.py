@@ -4,6 +4,7 @@ from typing import Dict
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import time
 from engines.analysis import AnalysisEngine
 from engines.scoring import ScoringEngine
 from engines.risk import RiskEngine
@@ -16,6 +17,10 @@ from fastapi.responses import JSONResponse
 load_dotenv()
 
 app = FastAPI(title="CoinEx Trader API")
+
+ohlcv_cache: Dict[str, tuple] = {}
+derivatives_cache: Dict[str, tuple] = {}
+CACHE_TTL = 30
 
 
 @app.exception_handler(RequestValidationError)
@@ -44,11 +49,31 @@ async def root():
 
 @app.post("/analyze")
 async def analyze_pair(req: AnalysisRequest):
-    client = CoinExClient(api_key=req.api_key, secret=req.secret)
-    ohlcv = client.get_market_data(req.symbol, req.timeframe)
+    cache_key = f"{req.symbol}:{req.timeframe}:{req.api_key[:8] if req.api_key else ''}"
+    current_time = time.time()
+
+    if cache_key in ohlcv_cache:
+        cached_time, cached_ohlcv = ohlcv_cache[cache_key]
+        if current_time - cached_time < CACHE_TTL:
+            ohlcv = cached_ohlcv
+        else:
+            client = CoinExClient(api_key=req.api_key, secret=req.secret)
+            ohlcv = client.get_market_data(req.symbol, req.timeframe)
+            if not isinstance(ohlcv, dict) or "error" not in ohlcv:
+                ohlcv_cache[cache_key] = (current_time, ohlcv)
+    else:
+        client = CoinExClient(api_key=req.api_key, secret=req.secret)
+        ohlcv = client.get_market_data(req.symbol, req.timeframe)
+        if not isinstance(ohlcv, dict) or "error" not in ohlcv:
+            ohlcv_cache[cache_key] = (current_time, ohlcv)
 
     if isinstance(ohlcv, dict) and "error" in ohlcv:
         raise HTTPException(status_code=400, detail=ohlcv["error"])
+
+    client = CoinExClient(api_key=req.api_key, secret=req.secret)
+    derivatives = client.get_derivatives_data(req.symbol)
+    derivatives_cache_key = f"derivatives:{req.symbol}"
+    derivatives_cache[derivatives_cache_key] = (current_time, derivatives)
 
     df = pd.DataFrame(
         ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
@@ -68,6 +93,7 @@ async def analyze_pair(req: AnalysisRequest):
         "analysis": analysis,
         "scoring": score_result,
         "risk_recommendations": risk_recommendations,
+        "derivatives": derivatives,
     }
 
 

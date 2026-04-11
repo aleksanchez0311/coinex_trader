@@ -138,6 +138,36 @@ class CoinExClient:
         except Exception as e:
             return {"error": str(e)}
 
+    def get_derivatives_data(self, symbol: str = "BTC/USDT:USDT") -> Dict:
+        """Obtiene datos de derivados: funding rate, liquidaciones"""
+        result = {"funding": None, "liquidations": None, "error": None}
+
+        try:
+            funding = self.client.fetch_funding_rate(symbol)
+            result["funding"] = {
+                "current": funding.get("fundingRate", 0),
+                "next": funding.get("nextFundingRate", 0),
+                "next_funding_time": funding.get("nextFundingTimestamp"),
+                "mark_price": funding.get("markPrice"),
+            }
+        except Exception as e:
+            result["error"] = f"Funding error: {e}"
+
+        try:
+            liquidations = self.client.fetch_liquidations(symbol, limit=20)
+            longs_liq = sum(1 for l in liquidations if l.get("side") == "buy")
+            shorts_liq = sum(1 for l in liquidations if l.get("side") == "sell")
+            result["liquidations"] = {
+                "total": len(liquidations),
+                "longs": longs_liq,
+                "shorts": shorts_liq,
+                "recent": liquidations[:5],
+            }
+        except Exception as e:
+            result["liquidation_error"] = str(e)
+
+        return result
+
     def execute_order(
         self,
         symbol: str,
@@ -296,24 +326,33 @@ class CoinExClient:
 
             # 2. Obtener trades cerrados (realized PnL + fees)
             try:
-                trades = self.client.fetch_my_trades(params={"type": "swap"})
-                for trade in trades:
-                    info = trade.get("info", {})
-                    pnl_val = float(info.get("realized_pnl", 0))
-                    fee_val = float(info.get("fee", 0) or 0)
-
-                    realized_pnl += pnl_val
-                    total_fees += fee_val
-
-                    if pnl_val != 0:
-                        pnl_records.append(
-                            {
-                                "symbol": trade.get("symbol"),
-                                "pnl": pnl_val,
-                                "fee": fee_val,
-                                "time": trade.get("datetime"),
-                            }
+                symbols = list(
+                    set([p.get("symbol") for p in positions if p.get("symbol")])
+                )
+                for sym in symbols:
+                    try:
+                        trades = self.client.fetch_my_trades(
+                            sym, params={"type": "swap"}
                         )
+                        for trade in trades:
+                            info = trade.get("info", {})
+                            pnl_val = float(info.get("realized_pnl", 0))
+                            fee_val = float(info.get("fee", 0) or 0)
+
+                            realized_pnl += pnl_val
+                            total_fees += fee_val
+
+                            if pnl_val != 0:
+                                pnl_records.append(
+                                    {
+                                        "symbol": trade.get("symbol"),
+                                        "pnl": pnl_val,
+                                        "fee": fee_val,
+                                        "time": trade.get("datetime"),
+                                    }
+                                )
+                    except:
+                        pass
             except Exception as e:
                 print(f"Error fetching trades: {e}")
 

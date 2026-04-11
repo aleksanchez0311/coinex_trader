@@ -3,6 +3,9 @@ import numpy as np
 from typing import List, Dict, Optional
 
 
+import concurrent.futures
+
+
 class AnalysisEngine:
     def __init__(self, df: pd.DataFrame):
         """
@@ -13,6 +16,8 @@ class AnalysisEngine:
         self.df["low"] = self.df["low"].astype(float)
         self.df["close"] = self.df["close"].astype(float)
         self.df["volume"] = self.df["volume"].astype(float)
+        self._swings_cache = None
+        self._fvgs_cache = None
 
     def detect_swings(self):
         """Detecta swing highs y swing lows"""
@@ -25,6 +30,9 @@ class AnalysisEngine:
 
     def detect_market_structure(self):
         """Detecta HH, HL, LH, LL, BOS y CHOCH"""
+        if self._swings_cache is not None:
+            return self._swings_cache
+
         self.detect_swings()
 
         swings = []
@@ -58,11 +66,14 @@ class AnalysisEngine:
                     {"index": i, "type": label, "price": price, "role": "support"}
                 )
 
-        return swings[-10:] if len(swings) > 10 else swings
+        result = swings[-10:] if len(swings) > 10 else swings
+        self._swings_cache = result
+        return result
 
-    def detect_bos_choch(self):
+    def detect_bos_choch(self, swings=None):
         """Detecta BOS (Break of Structure) y CHOCH (Change of Character)"""
-        swings = self.detect_market_structure()
+        if swings is None:
+            swings = self.detect_market_structure()
         if len(swings) < 4:
             return {"bos": None, "choch": None, "trend": "Neutral"}
 
@@ -113,6 +124,9 @@ class AnalysisEngine:
 
     def get_fvgs(self) -> List[Dict]:
         """Detecta Fair Value Gaps (Brechas de Valor Razonable)"""
+        if self._fvgs_cache is not None:
+            return self._fvgs_cache
+
         fvgs = []
         for i in range(1, len(self.df) - 1):
             low_i1 = self.df["low"].iloc[i + 1]
@@ -144,9 +158,10 @@ class AnalysisEngine:
 
         return fvgs[-5:] if len(fvgs) > 5 else fvgs
 
-    def get_order_blocks(self) -> List[Dict]:
+    def get_order_blocks(self, fvgs=None) -> List[Dict]:
         """Identifica Order Blocks (Bloques de Órdenes)"""
-        fvgs = self.get_fvgs()
+        if fvgs is None:
+            fvgs = self.get_fvgs()
         obs = []
 
         for fvg in fvgs:
@@ -237,13 +252,21 @@ class AnalysisEngine:
 
     def analyze_all(self):
         """Ejecuta análisis completo según metodología SMC + EMA + RSI + ATR"""
-        structure = self.detect_market_structure()
-        structure_signal = self.detect_bos_choch()
-        liquidity = self.detect_liquidity_zones()
-        fvgs = self.get_fvgs()
-        obs = self.get_order_blocks()
-        volume = self.get_volume_analysis()
-        indicators = self.get_indicators()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_structure = executor.submit(self.detect_market_structure)
+            future_liquidity = executor.submit(self.detect_liquidity_zones)
+            future_volume = executor.submit(self.get_volume_analysis)
+            future_indicators = executor.submit(self.get_indicators)
+
+            structure = future_structure.result()
+            structure_signal = self.detect_bos_choch(structure)
+
+            fvgs = self.get_fvgs()
+            obs = self.get_order_blocks(fvgs)
+
+            liquidity = future_liquidity.result()
+            volume = future_volume.result()
+            indicators = future_indicators.result()
 
         last_price = self.df["close"].iloc[-1]
 

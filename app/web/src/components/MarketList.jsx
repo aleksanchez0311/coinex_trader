@@ -206,6 +206,10 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
           <div className="space-y-2 pt-2 border-t border-border/30">
             <div className="text-[10px] text-gray-400 space-y-1">
               <div className="flex justify-between">
+                <span>Entrada:</span>
+                <span className="font-mono text-green-400">${result.plan?.entry?.toFixed(2) || analysis?.analysis?.last_price?.toFixed(2) || '---'}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Posición:</span>
                 <span className="font-mono text-white">{result.position?.position_size?.toFixed(4)} {selected?.split('/')[0]}</span>
               </div>
