@@ -32,7 +32,7 @@ trader/
 │   │   ├── models/
 │   │   │   └── trading.py        # Modelos Pydantic
 │   │   └── utils/
-│   │       └── coinex_client.py  # Cliente CoinEx (CCXT)
+│   │       └── exchange_clients.py # Clientes CoinEx/OKX (CCXT)
 │   └── web/                      # React + Vite
 │       ├── src/
 │       │   ├── components/       # Componentes UI
@@ -87,7 +87,7 @@ COINEX_SECRET=tu_api_secret
 
 ### Credenciales en la App
 
-Las credenciales configuradas en la página de **Configuración** tienen prioridad sobre las variables de entorno. Se almacenan en `localStorage` del navegador.
+Las credenciales configuradas en la página de **Configuración** tienen prioridad sobre las variables de entorno. Se almacenan en `localStorage` del navegador, en la misma sección donde se organizan los **Mercados Favoritos**.
 
 - **Actualizar desde LocalStorage**: Botón para recargar credenciales guardadas previamente
 - **Guardar Credenciales**: Guarda las credenciales actualizadas en localStorage
@@ -131,8 +131,9 @@ La estrategia combina:
 | `/risk-management` | POST | Cálculo de posición y riesgo |
 | `/execute-trade` | POST | Crear orden con SL/TP |
 | `/pnl-stats` | POST | Obtener PnL acumulado |
-| `/ticker/{symbol}` | GET | Precio actual de símbolo |
-| `/markets` | GET | Lista de mercados disponibles |
+| `/tickers` | POST | Precio y cambio en formato batch para múltiples símbolos |
+| `/top-gainers` | GET | Ranking de los activos de mayor crecimiento 24h |
+| `/markets` | GET | Lista de mercados disponibles (futuros) |
 | `/positions` | GET | Posiciones abiertas |
 
 ## 🖥️ Ejecutable Windows (Launcher)

@@ -38,18 +38,19 @@ trader/
 - `app/backend/engines/analysis.py` - SMC analysis engine
 - `app/backend/engines/risk.py` - Position sizing
 - `app/backend/engines/scoring.py` - Trade quality scoring
-- `app/backend/utils/coinex_client.py` - CoinEx API integration
+- `app/backend/utils/exchange_clients.py` - Exchange API interactions (CoinEx, OKX)
 
 ### Frontend
 - `app/web/src/App.jsx` - Main app with state management
-- `app/web/src/components/MarketList.jsx` - Favorites, risk form, open trade
+- `app/web/src/components/MarketList.jsx` - Favorites list display
 - `app/web/src/components/AnalysisBoard.jsx` - Analysis display
 - `app/web/src/components/PositionsTable.jsx` - Open positions
-- `app/web/src/components/Sidebar.jsx` - Navigation
+- `app/web/src/components/Sidebar.jsx` - Navigation and Global Risk Form
 - `app/web/src/components/Header.jsx` - Top header
-- `app/web/src/components/RiskPanel.jsx` - Risk management panel
+- `app/web/src/components/SettingsView.jsx` - API Config and Favorite Markets Manager
 - `app/web/src/components/StrategyView.jsx` - Strategy display
 - `app/web/src/components/RiskManagementView.jsx` - Risk management view
+
 
 ### Launcher
 - `release/exeify.bat` - Build executable script

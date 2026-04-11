@@ -8,6 +8,7 @@ import AnalysisBoard from './components/AnalysisBoard';
 import StrategyView from './components/StrategyView';
 import RiskManagementView from './components/RiskManagementView';
 import PositionsTable from './components/PositionsTable';
+import SettingsView from './components/SettingsView';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -264,9 +265,20 @@ const App = () => {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
+        selected={selectedSymbol}
+        analysis={analysisData}
+        result={riskResult}
+        slPrice={slPrice}
+        tpPrice={tpPrice}
+        leverage={leverage}
+        setLeverage={setLeverage}
+        capital={capital}
+        setCapital={setCapital}
+        riskPct={riskPct}
+        setRiskPct={setRiskPct}
+        calculateRisk={calculateRisk}
         onOpenTrade={handleOpenTrade}
         canOpenTrade={analysisData?.analysis?.bias !== 'Neutral'}
-        hasRiskResult={!!riskResult}
         bias={analysisData?.analysis?.bias || 'Neutral'}
       />
       
@@ -283,20 +295,6 @@ const App = () => {
                     selected={selectedSymbol} 
                     setSelected={setSelectedSymbol}
                     onSymbolSelect={handleSymbolSelect}
-                    analysis={analysisData}
-                    result={riskResult}
-                    slPrice={slPrice}
-                    tpPrice={tpPrice}
-                    leverage={leverage}
-                    setLeverage={setLeverage}
-                    capital={capital}
-                    setCapital={setCapital}
-                    riskPct={riskPct}
-                    setRiskPct={setRiskPct}
-                    calculateRisk={calculateRisk}
-                    onOpenTrade={handleOpenTrade}
-                    canOpenTrade={analysisData?.analysis?.bias !== 'Neutral'}
-                    bias={analysisData?.analysis?.bias || 'Neutral'}
                   />
                 </div>
 
@@ -325,61 +323,12 @@ const App = () => {
           )}
 
           {activeTab === 'settings' && (
-            // ... settings code ...
-            <div className="glass p-8 max-w-2xl mx-auto mt-10">
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <Settings className="text-accent" /> Configuración de API
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">CoinEx API Key</label>
-                  <input 
-                    type="password" 
-                    value={credentials.apiKey}
-                    onChange={(e) => setCredentials({...credentials, apiKey: e.target.value})}
-                    placeholder="Tu API Key" 
-                    className="w-full bg-surface border border-border p-3 rounded-lg outline-none focus:border-accent" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">CoinEx API Secret</label>
-                  <input 
-                    type="password" 
-                    value={credentials.apiSecret}
-                    onChange={(e) => setCredentials({...credentials, apiSecret: e.target.value})}
-                    placeholder="Tu API Secret" 
-                    className="w-full bg-surface border border-border p-3 rounded-lg outline-none focus:border-accent" 
-                  />
-                </div>
-                <button 
-                  onClick={() => {
-                    const saved = localStorage.getItem('trader_creds');
-                    if (saved) {
-                      setCredentials(JSON.parse(saved));
-                    } else {
-                      alert('No hay credenciales guardadas');
-                    }
-                  }}
-                  className="bg-surface border border-accent text-accent font-bold px-6 py-3 rounded-lg hover:bg-accent/10 transition-opacity"
-                >
-                  Actualizar desde LocalStorage
-                </button>
-                <button 
-                  onClick={() => saveCredentials(credentials)}
-                  className="bg-accent text-black font-bold px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  Guardar Credenciales
-                </button>
-                <button 
-                  onClick={() => {
-                    localStorage.removeItem('trader_creds');
-                    setCredentials({ apiKey: '', apiSecret: '' });
-                  }}
-                  className="bg-transparent border border-short text-short font-bold px-6 py-3 rounded-lg hover:bg-short/10 transition-opacity"
-                >
-                  Borrar Credenciales
-                </button>
-              </div>
+            <div className="w-full">
+              <SettingsView 
+                credentials={credentials} 
+                setCredentials={setCredentials} 
+                saveCredentials={saveCredentials} 
+              />
             </div>
           )}
         </div>
