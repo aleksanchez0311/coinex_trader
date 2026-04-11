@@ -14,8 +14,7 @@ const PositionsTable = ({ credentials }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           api_key: credentials.apiKey,
-          secret: credentials.apiSecret,
-          is_paper: false
+          secret: credentials.apiSecret
         })
       });
       const data = await response.json();
@@ -40,7 +39,6 @@ const PositionsTable = ({ credentials }) => {
         body: JSON.stringify({
           api_key: credentials.apiKey,
           secret: credentials.apiSecret,
-          is_paper: false,
           symbol: pos.symbol,
           side: pos.side,
           amount: pos.contracts

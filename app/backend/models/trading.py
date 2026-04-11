@@ -23,7 +23,6 @@ class TradeExecutionRequest(BaseModel):
     side: str
     amount: float
     entry_price: Optional[float] = None
-    is_paper: bool = True
     api_key: Optional[str] = None
     secret: Optional[str] = None
     stop_loss: Optional[float] = None

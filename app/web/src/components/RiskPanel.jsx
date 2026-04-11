@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Calculator, Play, XCircle, RefreshCw, X } from 'lucide-react';
 
-const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
+const RiskPanel = ({ symbol, analysis, credentials }) => {
   const [capital, setCapital] = useState(100);
   const [riskPct, setRiskPct] = useState(1);
   const [leverage, setLeverage] = useState(10);
@@ -40,8 +40,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             api_key: credentials.apiKey,
-            secret: credentials.apiSecret,
-            is_paper: false // SIEMPRE consultar el balance real
+            secret: credentials.apiSecret
           })
         });
         const data = await response.json();
@@ -110,8 +109,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
           margin_mode: marginMode,
           order_type: orderType,
           api_key: credentials.apiKey,
-          secret: credentials.apiSecret,
-          is_paper: !isLive
+          secret: credentials.apiSecret
         })
       });
       
@@ -280,7 +278,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
               } disabled:opacity-20 disabled:grayscale`}
             >
               {executing ? <RefreshCw className="animate-spin" /> : <Play fill="currentColor" size={18} />}
-              {executing ? 'Procesando...' : `ABRIR ${analysis?.analysis?.bias === 'Alcista' ? 'LONG' : 'SHORT'} ${isLive ? 'REAL' : '(SIM)'}`}
+              {executing ? 'Procesando...' : `ABRIR ${analysis?.analysis?.bias === 'Alcista' ? 'LONG' : 'SHORT'} REAL`}
             </button>
             <button className="w-full py-3 bg-white/5 border border-border rounded-xl text-xs font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
               <XCircle size={14} /> Cancelar Plan
@@ -290,7 +288,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
           <div className="p-3 bg-accent/5 rounded-lg border border-accent/10 flex items-start gap-3">
             <ShieldCheck size={16} className="text-accent mt-0.5" />
             <p className="text-[10px] text-gray-400 leading-relaxed">
-              Modo <span className={`${isLive ? 'text-short' : 'text-accent'} font-bold uppercase`}>{isLive ? 'Live Execution' : 'Smart Simulation'}</span> activo. TP1 fijado en {result?.plan?.tp1 || '...'} con cierre automático del 50%.
+              Modo <span className="text-short font-bold uppercase">Live Execution</span> activo. TP1 fijado en {result?.plan?.tp1 || '...'} con cierre automático del 50%.
             </p>
           </div>
         </div>
@@ -364,16 +362,7 @@ const RiskPanel = ({ symbol, analysis, credentials, isLive, setIsLive }) => {
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-gray-400">Ejecución:</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] ${!isLive ? 'text-accent' : 'text-gray-500'}`}>SIM</span>
-                  <button 
-                    onClick={() => setIsLive(!isLive)}
-                    className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${isLive ? 'bg-short' : 'bg-gray-700'}`}
-                  >
-                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 ${isLive ? 'left-6' : 'left-1'}`} />
-                  </button>
-                  <span className={`text-[10px] ${isLive ? 'text-short' : 'text-gray-500'}`}>REAL</span>
-                </div>
+                <span className="text-short text-xs font-bold uppercase">LIVE</span>
               </div>
             </div>
 

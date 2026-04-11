@@ -4,6 +4,8 @@ import { TrendingUp, TrendingDown, Clock, Search, X, Calculator, Play } from 'lu
 const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, slPrice, tpPrice, leverage, setLeverage, capital, setCapital, riskPct, setRiskPct, calculateRisk, onOpenTrade, canOpenTrade, bias }) => {
   const [showModal, setShowModal] = useState(false);
   const [allMarkets, setAllMarkets] = useState([]);
+  const [topGainers, setTopGainers] = useState([]);
+  const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [favorites, setFavorites] = useState([
     { symbol: 'BTC/USDT', price: null, change: null, up: true },
@@ -11,6 +13,26 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
     { symbol: 'SOL/USDT', price: null, change: null, up: true },
     { symbol: 'BNB/USDT', price: null, change: null, up: true },
     { symbol: 'XRP/USDT', price: null, change: null, up: true },
+    { symbol: 'ADA/USDT', price: null, change: null, up: true },
+    { symbol: 'DOGE/USDT', price: null, change: null, up: true },
+    { symbol: 'AVAX/USDT', price: null, change: null, up: true },
+    { symbol: 'LINK/USDT', price: null, change: null, up: true },
+    { symbol: 'DOT/USDT', price: null, change: null, up: true },
+    { symbol: 'MATIC/USDT', price: null, change: null, up: true },
+    { symbol: 'LTC/USDT', price: null, change: null, up: true },
+    { symbol: 'BCH/USDT', price: null, change: null, up: true },
+    { symbol: 'TRX/USDT', price: null, change: null, up: true },
+    { symbol: 'NEAR/USDT', price: null, change: null, up: true },
+    { symbol: 'INJ/USDT', price: null, change: null, up: true },
+    { symbol: 'OP/USDT', price: null, change: null, up: true },
+    { symbol: 'ARB/USDT', price: null, change: null, up: true },
+    { symbol: 'PEPE/USDT', price: null, change: null, up: true },
+    { symbol: 'SHIB/USDT', price: null, change: null, up: true },
+    { symbol: 'WIF/USDT', price: null, change: null, up: true },
+    { symbol: 'SUI/USDT', price: null, change: null, up: true },
+    { symbol: 'APT/USDT', price: null, change: null, up: true },
+    { symbol: 'FET/USDT', price: null, change: null, up: true },
+    { symbol: 'GALA/USDT', price: null, change: null, up: true },
   ]);
 
   const fetchTicker = async (symbol) => {
@@ -78,15 +100,28 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
     }
   };
 
+  const fetchTopGainers = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/top-gainers?limit=25');
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setTopGainers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching top gainers:", error);
+    }
+  };
+
   useEffect(() => {
-    if (showModal && allMarkets.length === 0) {
-      fetchAllMarkets();
+    if (showModal) {
+      if (allMarkets.length === 0) fetchAllMarkets();
+      if (topGainers.length === 0) fetchTopGainers();
     }
   }, [showModal]);
 
-  const filteredMarkets = allMarkets.filter(m => 
-    m.symbol.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const displayedMarkets = activeTab === 'all' 
+    ? allMarkets.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
+    : topGainers.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleSelect = (symbol) => {
     setSelected(symbol);
@@ -122,7 +157,7 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
         <span className="text-[10px] text-gray-500 font-bold uppercase">Cambio 24h</span>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 overflow-y-auto max-h-[350px] pr-2">
         {favorites.map((pair) => (
           <div
             key={pair.symbol}
@@ -264,7 +299,21 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
               </button>
             </div>
             
-            <div className="p-4">
+            <div className="p-4 border-b border-border/20">
+              <div className="flex gap-2 mb-3">
+                <button 
+                  onClick={() => setActiveTab('all')} 
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-accent text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                >
+                  Todos los Activos
+                </button>
+                <button 
+                  onClick={() => setActiveTab('gainers')} 
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex justify-center items-center gap-1 ${activeTab === 'gainers' ? 'bg-long text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                >
+                  <TrendingUp size={14} /> Top Ganadores 24h
+                </button>
+              </div>
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input 
@@ -279,26 +328,28 @@ const MarketList = ({ selected, setSelected, onSymbolSelect, analysis, result, s
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 scrollbar-premium">
-              {allMarkets.length === 0 ? (
+              {(activeTab === 'all' && allMarkets.length === 0) || (activeTab === 'gainers' && topGainers.length === 0) ? (
                 <div className="p-10 text-center space-y-3">
                   <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm text-gray-500">Cargando mercados desde CoinEx...</p>
+                  <p className="text-sm text-gray-500">Cargando {activeTab === 'gainers' ? 'top ganadores' : 'mercados'}...</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-1">
-                  {filteredMarkets.length > 0 ? (
-                    filteredMarkets.map((m) => (
+                  {displayedMarkets.length > 0 ? (
+                    displayedMarkets.map((m) => (
                       <button
                         key={m.symbol}
                         onClick={() => handleSelect(m.symbol)}
                         className="flex items-center justify-between p-3 hover:bg-accent/10 rounded-lg transition-colors group text-left"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded bg-surface border border-border flex items-center justify-center font-bold text-[10px] text-accent">
+                          <div className={`w-8 h-8 rounded bg-surface border flex items-center justify-center font-bold text-[10px] ${activeTab === 'gainers' ? 'border-long/30 text-long' : 'border-border text-accent'}`}>
                             {m.base.substring(0, 3)}
                           </div>
                           <div>
-                            <p className="font-bold text-sm group-hover:text-accent transition-colors">{m.symbol}</p>
+                            <p className="font-bold text-sm group-hover:text-accent transition-colors">
+                              {m.symbol} {activeTab === 'gainers' && <span className="ml-2 text-long text-xs">{m.percentage > 0 ? '+' : ''}{m.percentage.toFixed(2)}%</span>}
+                            </p>
                             <p className="text-[10px] text-gray-500 uppercase">{m.base} / {m.quote}</p>
                           </div>
                         </div>

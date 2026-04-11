@@ -8,7 +8,7 @@ import time
 from engines.analysis import AnalysisEngine
 from engines.scoring import ScoringEngine
 from engines.risk import RiskEngine
-from utils.coinex_client import CoinExClient
+from utils.exchange_clients import TradingClient, MarketDataClient
 from models.trading import AnalysisRequest, RiskRequest, TradeExecutionRequest
 
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +21,7 @@ app = FastAPI(title="CoinEx Trader API")
 ohlcv_cache: Dict[str, tuple] = {}
 derivatives_cache: Dict[str, tuple] = {}
 CACHE_TTL = 30
+market_client = MarketDataClient()
 
 
 @app.exception_handler(RequestValidationError)
@@ -57,21 +58,18 @@ async def analyze_pair(req: AnalysisRequest):
         if current_time - cached_time < CACHE_TTL:
             ohlcv = cached_ohlcv
         else:
-            client = CoinExClient(api_key=req.api_key, secret=req.secret)
-            ohlcv = client.get_market_data(req.symbol, req.timeframe)
+            ohlcv = market_client.get_ohlcv(req.symbol, req.timeframe)
             if not isinstance(ohlcv, dict) or "error" not in ohlcv:
                 ohlcv_cache[cache_key] = (current_time, ohlcv)
     else:
-        client = CoinExClient(api_key=req.api_key, secret=req.secret)
-        ohlcv = client.get_market_data(req.symbol, req.timeframe)
+        ohlcv = market_client.get_ohlcv(req.symbol, req.timeframe)
         if not isinstance(ohlcv, dict) or "error" not in ohlcv:
             ohlcv_cache[cache_key] = (current_time, ohlcv)
 
     if isinstance(ohlcv, dict) and "error" in ohlcv:
         raise HTTPException(status_code=400, detail=ohlcv["error"])
 
-    client = CoinExClient(api_key=req.api_key, secret=req.secret)
-    derivatives = client.get_derivatives_data(req.symbol)
+    derivatives = market_client.get_derivatives_data(req.symbol)
     derivatives_cache_key = f"derivatives:{req.symbol}"
     derivatives_cache[derivatives_cache_key] = (current_time, derivatives)
 
@@ -131,7 +129,7 @@ async def calculate_risk(req: RiskRequest):
 @app.post("/execute-trade")
 async def execute_trade(req: TradeExecutionRequest):
     print(f"DEBUG: Trade Execution Request: {req}")
-    client = CoinExClient(api_key=req.api_key, secret=req.secret, is_paper=req.is_paper)
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
 
     result = client.create_order_with_sl_tp(
         symbol=req.symbol,
@@ -158,9 +156,8 @@ async def get_balance(req: Dict = Body(...)):
     """Obtiene el balance de la cuenta (Swap por defecto)"""
     api_key = req.get("api_key")
     secret = req.get("secret")
-    is_paper = req.get("is_paper", True)
 
-    client = CoinExClient(api_key=api_key, secret=secret, is_paper=is_paper)
+    client = TradingClient(api_key=api_key, secret=secret)
     balance = client.get_balance()
 
     if "error" in balance:
@@ -174,9 +171,8 @@ async def get_positions(req: Dict = Body(...)):
     """Obtiene las posiciones abiertas"""
     api_key = req.get("api_key")
     secret = req.get("secret")
-    is_paper = req.get("is_paper", True)
 
-    client = CoinExClient(api_key=api_key, secret=secret, is_paper=is_paper)
+    client = TradingClient(api_key=api_key, secret=secret)
     positions = client.get_positions()
 
     if isinstance(positions, dict) and "error" in positions:
@@ -190,12 +186,11 @@ async def close_position(req: Dict = Body(...)):
     """Cierra una posición abierta"""
     api_key = req.get("api_key")
     secret = req.get("secret")
-    is_paper = req.get("is_paper", True)
     symbol = req.get("symbol")
     side = req.get("side")
     amount = req.get("amount")
 
-    client = CoinExClient(api_key=api_key, secret=secret, is_paper=is_paper)
+    client = TradingClient(api_key=api_key, secret=secret)
     result = client.close_position(symbol, side, amount)
 
     if isinstance(result, dict) and "error" in result:
@@ -209,12 +204,11 @@ async def get_pnl_stats(req: Dict = Body(...)):
     """Obtiene estadísticas de PnL realizado"""
     api_key = req.get("api_key")
     secret = req.get("secret")
-    is_paper = req.get("is_paper", True)
 
     if not api_key or not secret:
         return {"total_pnl": 0, "count": 0, "message": "Sin credenciales configuradas"}
 
-    client = CoinExClient(api_key=api_key, secret=secret, is_paper=is_paper)
+    client = TradingClient(api_key=api_key, secret=secret)
     stats = client.get_realized_pnl()
 
     if isinstance(stats, dict) and "error" in stats:
@@ -226,9 +220,7 @@ async def get_pnl_stats(req: Dict = Body(...)):
 @app.get("/markets")
 async def get_all_markets():
     """Obtiene todos los pares disponibles para futuros"""
-    client = CoinExClient(
-        is_paper=False
-    )  # Usamos is_paper=False para leer mercados reales
+    client = TradingClient()
     markets = client.get_all_markets()
 
     if isinstance(markets, dict) and "error" in markets:
@@ -237,11 +229,21 @@ async def get_all_markets():
     return markets
 
 
+@app.get("/top-gainers")
+async def get_top_gainers_endpoint(limit: int = 20):
+    """Obtiene el top de monedas con mayor porcentaje de crecimiento 24h"""
+    gainers = market_client.get_top_gainers(limit=limit)
+
+    if isinstance(gainers, dict) and "error" in gainers:
+        raise HTTPException(status_code=400, detail=gainers["error"])
+
+    return gainers
+
+
 @app.get("/ticker/{symbol}")
 async def get_ticker(symbol: str):
     """Obtiene precio actual y cambio 24h de un símbolo"""
-    client = CoinExClient(is_paper=False)
-    ticker = client.get_ticker(symbol)
+    ticker = market_client.get_ticker(symbol)
 
     if isinstance(ticker, dict) and "error" in ticker:
         raise HTTPException(status_code=400, detail=ticker["error"])
@@ -253,11 +255,10 @@ async def get_ticker(symbol: str):
 async def get_tickers_batch(req: Dict = Body(...)):
     """Obtiene precios de múltiples símbolos"""
     symbols = req.get("symbols", [])
-    client = CoinExClient(is_paper=False)
 
     results = {}
     for symbol in symbols:
-        ticker = client.get_ticker(symbol)
+        ticker = market_client.get_ticker(symbol)
         if "error" not in ticker:
             results[symbol] = ticker
 

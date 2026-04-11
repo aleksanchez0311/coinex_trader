@@ -70,8 +70,8 @@ const RiskManagementView = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
           <div className="p-4 bg-white/5 rounded-xl border border-border">
-            <h4 className="text-xs font-bold uppercase mb-2 text-gray-300">Modo Simulación (Paper)</h4>
-            <p className="text-[11px] text-gray-500">Activo por defecto para todas las nuevas cuentas. Permite probar estrategias sin riesgo de capital real.</p>
+            <h4 className="text-xs font-bold uppercase mb-2 text-gray-300">Ejecución en Vivo (Live)</h4>
+            <p className="text-[11px] text-gray-500">Todas las operaciones se ejecutan directamente en CoinEx. Verifica siempre el SL y apalancamiento antes de confirmar.</p>
           </div>
           <div className="p-4 bg-white/5 rounded-xl border border-border">
             <h4 className="text-xs font-bold uppercase mb-2 text-gray-300">Límites de Apalancamiento</h4>

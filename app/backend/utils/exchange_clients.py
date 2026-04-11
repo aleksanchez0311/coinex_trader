@@ -1,12 +1,115 @@
 import ccxt
 import os
-import hashlib
 import time
-from typing import Dict, Any
+from typing import Dict
 
 
-class CoinExClient:
-    def __init__(self, api_key: str = None, secret: str = None, is_paper: bool = True):
+class MarketDataClient:
+    """Cliente para datos de mercado vía OKX (OHLCV, tickers, derivados)"""
+
+    def __init__(self):
+        self.client = ccxt.okx({"enableRateLimit": True})
+        self.client.options["defaultType"] = "swap"
+
+    def _normalize_symbol(self, symbol: str) -> str:
+        """Normaliza símbolo al formato base OKX (SYM/USDT)"""
+        sym = symbol.replace(":USDT", "").replace("-USDT", "")
+        if not sym.endswith("/USDT"):
+            sym = sym.replace("USDT", "/USDT")
+        return sym
+
+    def get_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 200):
+        """Obtiene OHLCV desde OKX (más rápido que CoinEx)"""
+        try:
+            sym = self._normalize_symbol(symbol)
+            ohlcv = self.client.fetch_ohlcv(sym, timeframe, limit=limit)
+            return ohlcv
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_ticker(self, symbol: str):
+        """Obtiene precio actual y cambio 24h"""
+        try:
+            sym = self._normalize_symbol(symbol)
+            ticker = self.client.fetch_ticker(sym)
+            return {
+                "symbol": sym,
+                "last": ticker.get("last"),
+                "percentage": ticker.get("percentage"),
+                "up": ticker.get("last", 0) > ticker.get("open", 0),
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_top_gainers(self, limit: int = 20):
+        """Obtiene los pares con mayor rendimiento (ganadores 24h)"""
+        try:
+            tickers = self.client.fetch_tickers()
+            valid_tickers = []
+            
+            for sym, ticker in tickers.items():
+                pct = ticker.get("percentage")
+                # Filtramos para enfocarnos en pares basados en USDT y con data válida
+                if pct is not None and "USDT" in sym and "-USDC" not in sym:
+                    clean_sym = self._normalize_symbol(sym)
+                    
+                    # Filtro contra apalancados y stablecoins irrelevantes
+                    if clean_sym.split('/')[0] not in ['USDC', 'DAI', 'TUSD']:
+                        valid_tickers.append({
+                            "symbol": clean_sym,
+                            "base": clean_sym.split('/')[0] if '/' in clean_sym else clean_sym,
+                            "quote": "USDT",
+                            "percentage": pct,
+                            "last": ticker.get("last"),
+                            "up": ticker.get("last", 0) > ticker.get("open", 0)
+                        })
+                    
+            # Eliminar duplicados para seguridad
+            unique_tickers = {t["symbol"]: t for t in valid_tickers}
+            valid_tickers = list(unique_tickers.values())
+            
+            # Ordenar de mayor a menor porcentaje
+            valid_tickers.sort(key=lambda x: x["percentage"], reverse=True)
+            return valid_tickers[:limit]
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_derivatives_data(self, symbol: str = "BTC/USDT:USDT") -> Dict:
+        """Obtiene datos de derivados: funding rate, liquidaciones"""
+        result = {"funding": None, "liquidations": None, "error": None}
+        swap_sym = f"{self._normalize_symbol(symbol)}:USDT"
+
+        try:
+            funding = self.client.fetch_funding_rate(swap_sym)
+            result["funding"] = {
+                "current": funding.get("fundingRate", 0),
+                "next": funding.get("nextFundingRate", 0),
+                "next_funding_time": funding.get("nextFundingTimestamp"),
+                "mark_price": funding.get("markPrice"),
+            }
+        except Exception as e:
+            result["error"] = f"Funding error: {e}"
+
+        try:
+            liquidations = self.client.fetch_liquidations(swap_sym, limit=20)
+            longs_liq = sum(1 for l in liquidations if l.get("side") == "buy")
+            shorts_liq = sum(1 for l in liquidations if l.get("side") == "sell")
+            result["liquidations"] = {
+                "total": len(liquidations),
+                "longs": longs_liq,
+                "shorts": shorts_liq,
+                "recent": liquidations[:5],
+            }
+        except Exception as e:
+            result["liquidation_error"] = str(e)
+
+        return result
+
+
+class TradingClient:
+    """Cliente de ejecución de órdenes en CoinEx (futuros/swap)"""
+
+    def __init__(self, api_key: str = None, secret: str = None):
         self.api_key = api_key or os.getenv("COINEX_API_KEY")
         self.secret = secret or os.getenv("COINEX_SECRET")
 
@@ -21,20 +124,10 @@ class CoinExClient:
         self.client.options["createMarketBuyOrderRequiresPrice"] = False
         self.client.options["defaultMarginMode"] = "isolated"
 
-        self.is_paper = is_paper
-
     def set_leverage(self, symbol: str, leverage: int, margin_mode: str = "isolated"):
         """Configura el apalancamiento y modo de margen para el símbolo"""
-        if self.is_paper:
-            return {
-                "status": "success (simulation)",
-                "leverage": leverage,
-                "margin_mode": margin_mode,
-            }
-
         try:
             self.client.load_markets()
-            market = self.client.market(symbol)
             response = self.client.set_leverage(
                 leverage,
                 symbol,
@@ -64,22 +157,21 @@ class CoinExClient:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
         try:
-            if not self.is_paper:
-                self.client.load_markets()
-                if symbol not in self.client.markets:
-                    alt_symbol = symbol.split(":")[0]
-                    if alt_symbol in self.client.markets:
-                        symbol = alt_symbol
+            self.client.load_markets()
+            if symbol not in self.client.markets:
+                alt_symbol = symbol.split(":")[0]
+                if alt_symbol in self.client.markets:
+                    symbol = alt_symbol
 
-                market = self.client.market(symbol)
-                min_amount = market.get("limits", {}).get("amount", {}).get("min", 0)
+            market = self.client.market(symbol)
+            min_amount = market.get("limits", {}).get("amount", {}).get("min", 0)
 
-                if amount < min_amount:
-                    raise Exception(f"Posición muy pequeña: mínimo {min_amount}")
+            if amount < min_amount:
+                raise Exception(f"Posición muy pequeña: mínimo {min_amount}")
 
-                amount = float(self.client.amount_to_precision(symbol, amount))
+            amount = float(self.client.amount_to_precision(symbol, amount))
 
-                self.set_leverage(symbol, leverage, margin_mode)
+            self.set_leverage(symbol, leverage, margin_mode)
 
             params = {}
 
@@ -115,58 +207,8 @@ class CoinExClient:
             return order
 
         except Exception as e:
-            if self.is_paper:
-                return {
-                    "status": "success (simulation)",
-                    "order_id": f"sim_{int(time.time())}",
-                    "symbol": symbol,
-                    "side": side,
-                    "amount": amount,
-                    "entry_price": entry_price,
-                    "stop_loss": stop_loss,
-                    "take_profit": take_profit,
-                    "leverage": leverage,
-                    "margin_mode": margin_mode,
-                }
             return {"error": str(e)}
 
-    def get_market_data(self, symbol: str, timeframe: str = "1h", limit: int = 100):
-        """Obtiene OHLCV"""
-        try:
-            ohlcv = self.client.fetch_ohlcv(symbol, timeframe, limit=limit)
-            return ohlcv
-        except Exception as e:
-            return {"error": str(e)}
-
-    def get_derivatives_data(self, symbol: str = "BTC/USDT:USDT") -> Dict:
-        """Obtiene datos de derivados: funding rate, liquidaciones"""
-        result = {"funding": None, "liquidations": None, "error": None}
-
-        try:
-            funding = self.client.fetch_funding_rate(symbol)
-            result["funding"] = {
-                "current": funding.get("fundingRate", 0),
-                "next": funding.get("nextFundingRate", 0),
-                "next_funding_time": funding.get("nextFundingTimestamp"),
-                "mark_price": funding.get("markPrice"),
-            }
-        except Exception as e:
-            result["error"] = f"Funding error: {e}"
-
-        try:
-            liquidations = self.client.fetch_liquidations(symbol, limit=20)
-            longs_liq = sum(1 for l in liquidations if l.get("side") == "buy")
-            shorts_liq = sum(1 for l in liquidations if l.get("side") == "sell")
-            result["liquidations"] = {
-                "total": len(liquidations),
-                "longs": longs_liq,
-                "shorts": shorts_liq,
-                "recent": liquidations[:5],
-            }
-        except Exception as e:
-            result["liquidation_error"] = str(e)
-
-        return result
 
     def execute_order(
         self,
@@ -176,56 +218,34 @@ class CoinExClient:
         price: float = None,
         order_type: str = "market",
     ):
-        """Ejecuta orden (Simulada si is_paper=True)"""
+        """Ejecuta orden en CoinEx (LIVE)"""
 
         # Para Futuros en CCXT/CoinEx, el símbolo ideal es SYMBOL/CURRENCY:CURRENCY
         if ":" not in symbol:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
-        # 1. Ajustar precisión del amount según el mercado
+        # Ajustar precisión del amount según el mercado
         try:
-            if not self.is_paper:
-                self.client.load_markets()
-                if symbol not in self.client.markets:
-                    # Intento alternativo sin el sufijo si el primero falla
-                    alt_symbol = symbol.split(":")[0]
-                    if alt_symbol in self.client.markets:
-                        symbol = alt_symbol
+            self.client.load_markets()
+            if symbol not in self.client.markets:
+                alt_symbol = symbol.split(":")[0]
+                if alt_symbol in self.client.markets:
+                    symbol = alt_symbol
 
-                market = self.client.market(symbol)
-                min_amount = market.get("limits", {}).get("amount", {}).get("min", 0)
+            market = self.client.market(symbol)
+            min_amount = market.get("limits", {}).get("amount", {}).get("min", 0)
 
-                if amount < min_amount:
-                    raise Exception(
-                        f"Posición muy pequeña: {amount} {symbol.split('/')[0]}. El mínimo en CoinEx para este par es {min_amount}. Sube el Capital o el Riesgo %."
-                    )
+            if amount < min_amount:
+                raise Exception(
+                    f"Posición muy pequeña: {amount} {symbol.split('/')[0]}. El mínimo en CoinEx para este par es {min_amount}. Sube el Capital o el Riesgo %."
+                )
 
-                amount = float(self.client.amount_to_precision(symbol, amount))
-                print(f"DEBUG: Adjusted Amount for {symbol}: {amount}")
-            else:
-                amount = round(amount, 4)  # Simulación de precisión estándar
+            amount = float(self.client.amount_to_precision(symbol, amount))
         except Exception as e:
             print(f"Error ajustando precisión o cargando mercados: {e}")
 
-        if self.is_paper:
-            import time
-
-            time.sleep(1.5)  # Simular latencia de red
-            return {
-                "status": "success (simulation)",
-                "order_id": f"sim_{int(time.time())}",
-                "symbol": symbol,
-                "side": side,
-                "amount": amount,
-                "price": price or "market_price",
-            }
-
         try:
-            # En futuros CoinEx, a veces el side debe ser 'buy'/'sell'
-            # pero ccxt suele mapearlo bien.
             if order_type == "market":
-                # Para Futuros (Swap), la mayoría de los exchanges NO requieren precio en market buy.
-                # Si CoinEx lo pide vía CCXT, es un error de mapeo que resolvemos con params.
                 order = self.client.create_market_order(symbol, side, amount)
             else:
                 order = self.client.create_limit_order(symbol, side, amount, price)
@@ -234,29 +254,14 @@ class CoinExClient:
             return {"error": str(e)}
 
     def get_balance(self):
-        if self.is_paper:
-            return {"USDT": {"free": 100.0, "used": 0.0, "total": 100.0}}
+        """Obtiene el balance real de la cuenta swap"""
         try:
             return self.client.fetch_balance()
         except Exception as e:
             return {"error": str(e)}
 
     def get_positions(self):
-        if self.is_paper:
-            return [
-                {
-                    "symbol": "BTC/USDT",
-                    "side": "long",
-                    "contracts": 0.05,
-                    "entryPrice": 69420.0,
-                    "markPrice": 71000.0,
-                    "unrealizedPnl": 79.0,
-                    "leverage": 20,
-                    "percentage": 11.4,
-                    "notional": 3550.0,
-                    "isolated": True,
-                }
-            ]
+        """Obtiene las posiciones abiertas reales"""
         try:
             positions = self.client.fetch_positions()
             # Filtrar solo posiciones con tamaño > 0
@@ -270,9 +275,6 @@ class CoinExClient:
 
     def close_position(self, symbol: str, side: str, amount: float):
         """Cierra una posición abriendo la orden contraria"""
-        if self.is_paper:
-            return {"status": "success", "message": "Posición simulada cerrada"}
-
         try:
             # Si la posición es 'long', cerramos con un 'sell'
             # Si es 'short', cerramos con un 'buy'
@@ -304,8 +306,6 @@ class CoinExClient:
 
     def get_realized_pnl(self, limit=50):
         """Obtiene el PnL total: realizado + no realizado + fees"""
-        if self.is_paper:
-            return {"total_pnl": 125.50, "count": 12}
 
         try:
             total_pnl = 0.0
@@ -370,21 +370,4 @@ class CoinExClient:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_ticker(self, symbol: str):
-        """Obtiene el precio actual y cambio 24h de un símbolo"""
-        if self.is_paper:
-            return {"symbol": symbol, "last": 50000.0, "percentage": 2.5, "up": True}
-        try:
-            if ":" not in symbol:
-                symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
-            ticker = self.client.fetch_ticker(symbol)
-
-            return {
-                "symbol": symbol.split(":")[0],
-                "last": ticker.get("last"),
-                "percentage": ticker.get("percentage"),
-                "up": ticker.get("last", 0) > ticker.get("open", 0),
-            }
-        except Exception as e:
-            return {"error": str(e)}

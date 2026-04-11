@@ -47,8 +47,7 @@ const App = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           api_key: credentials.apiKey,
-          secret: credentials.apiSecret,
-          is_paper: false
+          secret: credentials.apiSecret
         })
       });
       if (!response.ok) {
@@ -86,7 +85,7 @@ const App = () => {
 
   const fetchAnalysis = async (symbol) => {
     setIsLoading(true);
-    setAnalysisStep(`Descargando datos OHLCV de ${symbol}...`);
+    setAnalysisStep(`Conectando con OKX • Descargando velas 1h de ${symbol}...`);
     try {
       const response = await fetch('http://localhost:8000/analyze', {
         method: 'POST',
@@ -98,11 +97,11 @@ const App = () => {
         })
       });
       
-      setAnalysisStep('Analizando estructura SMC...');
+      setAnalysisStep(`Procesando ${symbol} • Estructura SMC + EMA + RSI + ATR...`);
       const data = await response.json();
       
-      setAnalysisStep('Calculando indicadores...');
       setAnalysisData(data);
+      setAnalysisStep(`Análisis completo • Score: ${data?.scoring?.total_score || '...'}/100`);
     } catch (error) {
       console.error("Error fetching analysis:", error);
     } finally {
@@ -195,8 +194,7 @@ const App = () => {
           margin_mode: marginMode,
           order_type: orderType,
           api_key: credentials.apiKey,
-          secret: credentials.apiSecret,
-          is_paper: false
+          secret: credentials.apiSecret
         })
       });
       const data = await response.json();
