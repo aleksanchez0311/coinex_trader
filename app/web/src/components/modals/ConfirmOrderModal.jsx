@@ -28,40 +28,41 @@ const ConfirmOrderModal = ({
   const isLong = currentTradeSide === 'buy';
 
   return (
-    <div style={{ backgroundColor: 'transparent', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ backgroundColor: '#1a1a1f', border: '1px solid #374151', padding: '1rem', width: '400px', maxWidth: '95%', borderRadius: '0.75rem' }}>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-white">Abrir Posición</h3>
-            <span className={`px-2 py-0.5 rounded text-xs font-bold ${isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'transparent' }}>
+      <div className="glass-elevated w-full max-w-md mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: '#2B3139' }}>
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-lg text-white">Abrir Posición</h3>
+            <span className={`px-3 py-1 rounded-md text-xs font-semibold uppercase ${isLong ? 'state-long' : 'state-short'}`}>
               {isLong ? 'LONG' : 'SHORT'}
             </span>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <X size={18} />
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-elevated transition-colors">
+            <X size={18} className="text-neutral" />
           </button>
         </div>
 
         {/* Parámetros editables */}
-        <div className="space-y-3 mb-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-5 space-y-4 border-b" style={{ borderColor: '#2B3139' }}>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] text-gray-500 uppercase">Tipo Orden</label>
+              <label className="font-label text-neutral block mb-2">Tipo Orden</label>
               <select 
                 value={orderType}
                 onChange={(e) => setOrderType(e.target.value)}
-                className="w-full p-1.5 rounded text-white text-xs mt-1" style={{ backgroundColor: '#121216', border: '1px solid #374151' }}
+                className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-textPrimary text-sm focus:border-long focus:outline-none"
               >
                 <option value="limit">Limit</option>
                 <option value="market">Market</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-gray-500 uppercase">Apalancamiento</label>
+              <label className="font-label text-neutral block mb-2">Apalancamiento</label>
               <select 
                 value={leverage}
                 onChange={(e) => setLeverage(Number(e.target.value))}
-                className="w-full p-1.5 rounded text-white text-xs mt-1" style={{ backgroundColor: '#121216', border: '1px solid #374151' }}
+                className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-textPrimary text-sm focus:border-long focus:outline-none"
               >
                 <option value="10">10x</option>
                 <option value="20">20x</option>
@@ -70,22 +71,26 @@ const ConfirmOrderModal = ({
               </select>
             </div>
           </div>
+
           <div>
-            <label className="text-[10px] text-gray-500 uppercase">Cantidad a Arriesgar (USDT)</label>
+            <label className="font-label text-neutral block mb-2">Cantidad a Arriesgar (USDT)</label>
             <input 
               type="number"
               value={riskAmount}
               onChange={(e) => setRiskAmount(Number(e.target.value))}
-              className="w-full p-1.5 rounded text-white font-mono text-sm mt-1" style={{ backgroundColor: '#121216', border: '1px solid #374151' }}
+              className="w-full bg-surface border border-border rounded-md px-3 py-2.5 font-data text-textPrimary text-sm focus:border-long focus:outline-none"
             />
-            <p className="text-[9px] text-gray-500 mt-1">Margen: {riskAmount} USDT | Tamaño: {riskAmount * leverage} USDT</p>
+            <p className="text-xs text-neutral mt-2">
+              Margen: <span className="text-textPrimary">{riskAmount} USDT</span> | Tamaño: <span className="text-textPrimary">{riskAmount * leverage} USDT</span>
+            </p>
           </div>
+
           <div>
-            <label className="text-[10px] text-gray-500 uppercase">Modo Margen</label>
+            <label className="font-label text-neutral block mb-2">Modo Margen</label>
             <select 
               value={marginMode}
               onChange={(e) => setMarginMode(e.target.value)}
-              className="w-full p-1.5 rounded text-white text-xs mt-1" style={{ backgroundColor: '#121216', border: '1px solid #374151' }}
+              className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-textPrimary text-sm focus:border-long focus:outline-none"
             >
               <option value="isolated">Aislado</option>
               <option value="cross">Cruzado</option>
@@ -94,53 +99,53 @@ const ConfirmOrderModal = ({
         </div>
 
         {/* Valores del análisis */}
-        <div className="space-y-2 text-xs">
-          <div className="flex justify-between py-1.5 border-b border-gray-700">
-            <span className="text-gray-400">Par:</span>
-            <span className="font-mono text-white">{selectedSymbol}</span>
+        <div className="p-5 space-y-3 border-b" style={{ borderColor: '#2B3139' }}>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-neutral">Par</span>
+            <span className="font-data text-textPrimary">{selectedSymbol}</span>
           </div>
-          <div className="flex justify-between py-1.5 border-b border-gray-700">
-            <span className="text-gray-400">Entrada:</span>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-neutral">Entrada</span>
             <input 
               type="number"
               value={entryPrice || ''}
               onChange={(e) => setEntryPrice(Number(e.target.value))}
-              className="bg-transparent border border-gray-600 rounded px-2 py-0.5 text-white font-mono text-xs w-24 text-right"
+              className="bg-surface border border-border rounded px-3 py-1.5 font-data text-textPrimary text-sm w-32 text-right focus:border-long focus:outline-none"
             />
           </div>
-          <div className="flex justify-between py-1.5 border-b border-gray-700">
-            <span className="text-gray-400">Stop Loss:</span>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-neutral">Stop Loss</span>
             <input 
               type="number"
               value={slPrice || ''}
               onChange={(e) => setSlPrice(Number(e.target.value))}
-              className="bg-transparent border border-gray-600 rounded px-2 py-0.5 text-red-400 font-mono text-xs w-24 text-right"
+              className="bg-surface border border-border rounded px-3 py-1.5 font-data text-short text-sm w-32 text-right focus:border-short focus:outline-none"
             />
           </div>
-          <div className="flex justify-between py-1.5 border-b border-gray-700">
-            <span className="text-gray-400">Take Profit:</span>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-neutral">Take Profit</span>
             <input 
               type="number"
               value={tpPrice || ''}
               onChange={(e) => setTpPrice(Number(e.target.value))}
-              className="bg-transparent border border-gray-600 rounded px-2 py-0.5 text-green-400 font-mono text-xs w-24 text-right"
+              className="bg-surface border border-border rounded px-3 py-1.5 font-data text-long text-sm w-32 text-right focus:border-long focus:outline-none"
             />
           </div>
         </div>
 
         {/* Resumen de riesgo */}
-        <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-          <div className="flex justify-between text-xs mb-2">
-            <span className="text-gray-500">Pérdida máx. si SL:</span>
-            <span className="font-mono text-red-400">
+        <div className="p-5 bg-surface-elevated rounded-b-lg">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-neutral">Pérdida máx. si SL:</span>
+            <span className="font-data text-short">
               {entryPrice && slPrice ? 
                 Math.abs(((entryPrice - slPrice) / entryPrice) * riskAmount * leverage).toFixed(2) 
                 : '---'} USDT
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-500">Ganancia máx. si TP:</span>
-            <span className="font-mono text-green-400">
+          <div className="flex justify-between text-sm">
+            <span className="text-neutral">Ganancia máx. si TP:</span>
+            <span className="font-data text-long">
               {entryPrice && tpPrice ? 
                 Math.abs(((tpPrice - entryPrice) / entryPrice) * riskAmount * leverage).toFixed(2) 
                 : '---'} USDT
@@ -148,18 +153,18 @@ const ConfirmOrderModal = ({
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2">
+        {/* Botones */}
+        <div className="p-5 flex gap-3">
           <button 
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg text-xs font-medium border border-gray-600 hover:bg-white/5"
-            style={{ color: '#9ca3af' }}
+            className="flex-1 py-3 px-4 rounded-md font-semibold text-sm border border-border text-textSecondary hover:bg-surface-elevated transition-all"
           >
             Cancelar
           </button>
           <button 
             onClick={onConfirm}
             disabled={executing}
-            className={`flex-1 py-2.5 rounded-lg text-xs font-bold ${isLong ? 'bg-green-500 text-black' : 'bg-red-500 text-white'} ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`flex-1 py-3 px-4 rounded-md font-semibold text-sm transition-all ${executing ? 'opacity-50 cursor-not-allowed' : ''} ${isLong ? 'bg-long text-background hover:brightness-110' : 'bg-short text-white hover:brightness-110'}`}
           >
             {executing ? 'Ejecutando...' : 'Confirmar'}
           </button>
