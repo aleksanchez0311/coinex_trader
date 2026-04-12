@@ -20,17 +20,21 @@ const App = () => {
   const [pnlLoading, setPnlLoading] = useState(false);
   
   // Estado para Risk Management
-  const [capital, setCapital] = useState(100);
-  const [riskPct, setRiskPct] = useState(1);
-  const [leverage, setLeverage] = useState(10);
+  const [capital, setCapital] = useState(30);
+  const [riskPct, setRiskPct] = useState(50);
+  const [leverage, setLeverage] = useState(20);
   const [slPrice, setSlPrice] = useState(0);
   const [tpPrice, setTpPrice] = useState(0);
   const [riskResult, setRiskResult] = useState(null);
   const [executing, setExecuting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [currentTradingPlan, setCurrentTradingPlan] = useState(null);
   const [marginMode, setMarginMode] = useState('isolated');
   const [orderType, setOrderType] = useState('limit');
   const [entryPrice, setEntryPrice] = useState(null);
+  const [riskAmount, setRiskAmount] = useState(21);
+  const [currentTradeSide, setCurrentTradeSide] = useState(null);
   
   // Gestión de credenciales
   const [credentials, setCredentials] = useState(() => {
@@ -182,19 +186,26 @@ const App = () => {
   };
 
   const executeTrade = async () => {
-    if (!riskResult || !analysisData) return;
+    if (!entryPrice || !slPrice) {
+      alert("Error: Necesitas especificar precio de entrada y stop loss");
+      return;
+    }
     setExecuting(true);
+    
+    const positionSize = riskAmount * leverage;
+    const tokenAmount = positionSize / entryPrice;
+    
     try {
       const response = await fetch('http://localhost:8000/execute-trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol: selectedSymbol,
-          side: analysisData.analysis.bias === "Alcista" ? 'buy' : 'sell',
-          amount: riskResult.position.position_size,
-          entry_price: orderType === 'market' ? null : (entryPrice || analysisData.analysis.last_price),
+          side: currentTradeSide || (analysisData.analysis.bias === "Alcista" ? 'buy' : 'sell'),
+          amount: tokenAmount,
+          entry_price: orderType === 'market' ? null : entryPrice,
           stop_loss: slPrice,
-          take_profit: tpPrice || riskResult.plan?.tp1 || null,
+          take_profit: tpPrice || null,
           leverage: leverage,
           margin_mode: marginMode,
           order_type: orderType,
@@ -222,10 +233,12 @@ const App = () => {
       setTpPrice(0);
       setSlPrice(0);
       setRiskResult(null);
-      setCapital(100);
-      setRiskPct(1);
-      setLeverage(10);
+      setCapital(30);
+      setRiskPct(50);
+      setLeverage(20);
       setEntryPrice(null);
+      setRiskAmount(21);
+      setCurrentTradeSide(null);
     }
   }, [selectedSymbol]);
 
@@ -257,9 +270,19 @@ const App = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [selectedSymbol]);
 
-  const handleOpenTrade = () => {
-    if (analysisData?.analysis?.bias !== 'Neutral') {
-      setEntryPrice(analysisData.analysis.last_price);
+  const handleOpenTrade = (tradingPlan) => {
+    if (tradingPlan && tradingPlan.sesgo_principal !== 'NO TRADE') {
+      setCurrentTradeSide(tradingPlan.sesgo_principal === 'LONG' ? 'buy' : 'sell');
+      setEntryPrice(tradingPlan.entry || tradingPlan.entry_ideal || analysisData.analysis.last_price);
+      setSlPrice(tradingPlan.sl || tradingPlan.stop_loss?.nivel);
+      if (tradingPlan.tp1) {
+        setTpPrice(tradingPlan.tp1);
+      } else if (tradingPlan.take_profits?.[0]?.nivel) {
+        setTpPrice(tradingPlan.take_profits[0].nivel);
+      }
+      setLeverage(20);
+      setRiskAmount(Math.round(capital * 0.7));
+      setRiskPct(50);
       setShowConfirmModal(true);
     }
   };
@@ -270,20 +293,6 @@ const App = () => {
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
         selected={selectedSymbol}
-        analysis={analysisData}
-        result={riskResult}
-        slPrice={slPrice}
-        tpPrice={tpPrice}
-        leverage={leverage}
-        setLeverage={setLeverage}
-        capital={capital}
-        setCapital={setCapital}
-        riskPct={riskPct}
-        setRiskPct={setRiskPct}
-        calculateRisk={calculateRisk}
-        onOpenTrade={handleOpenTrade}
-        canOpenTrade={analysisData?.analysis?.bias !== 'Neutral'}
-        bias={analysisData?.analysis?.bias || 'Neutral'}
       />
       
       <main className="flex-1 flex flex-col min-w-0">
@@ -309,6 +318,7 @@ const App = () => {
                     data={analysisData} 
                     loading={isLoading}
                     analysisStep={analysisStep}
+                    onOpenTrade={handleOpenTrade}
                   />
                 </div>
               </div>
@@ -340,87 +350,132 @@ const App = () => {
 
       {/* Modal de Confirmación */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="glass border border-border p-4 w-[350px] max-w-[90%]">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-base font-bold text-white">Confirmar Orden</h3>
+        <div style={{ backgroundColor: 'rgba(0,0,0,1)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ backgroundColor: '#1a1a1f', border: '1px solid var(--color-border)', padding: '1rem', width: '400px', maxWidth: '95%', borderRadius: '0.75rem' }}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white">Abrir Posición</h3>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  currentTradeSide === 'buy' ? 'bg-long/20 text-long' : 'bg-short/20 text-short'
+                }`}>
+                  {currentTradeSide === 'buy' ? 'LONG' : 'SHORT'}
+                </span>
+              </div>
               <button onClick={() => setShowConfirmModal(false)} className="text-gray-400 hover:text-white">
                 <X size={18} />
               </button>
             </div>
             
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Par:</span>
-                <span className="font-mono text-white">{selectedSymbol}</span>
+            {/* Parámetros editables */}
+            <div className="space-y-3 mb-4 p-3 bg-surface/30 rounded-lg">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase">Tipo Orden</label>
+                  <select 
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value)}
+                    className="w-full bg-surface border border-border rounded px-2 py-1.5 text-white text-xs mt-1"
+                  >
+                    <option value="limit">Limit</option>
+                    <option value="market">Market</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase">Apalancamiento</label>
+                  <select 
+                    value={leverage}
+                    onChange={(e) => setLeverage(Number(e.target.value))}
+                    className="w-full bg-surface border border-border rounded px-2 py-1.5 text-white text-xs mt-1"
+                  >
+                    <option value="10">10x</option>
+                    <option value="20">20x</option>
+                    <option value="50">50x</option>
+                    <option value="100">100x</option>
+                  </select>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Orden:</span>
-                <select 
-                  value={orderType}
-                  onChange={(e) => setOrderType(e.target.value)}
-                  className="bg-surface border border-border rounded px-2 py-0.5 text-white text-xs"
-                >
-                  <option value="limit">Limit</option>
-                  <option value="market">Market</option>
-                </select>
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase">Cantidad a Arriesgar (USDT)</label>
+                <input 
+                  type="number"
+                  value={riskAmount}
+                  onChange={(e) => setRiskAmount(Number(e.target.value))}
+                  className="w-full bg-surface border border-border rounded px-2 py-1.5 text-white font-mono text-sm mt-1"
+                />
+                <p className="text-[9px] text-gray-500 mt-1">Margen: {riskAmount} USDT | Tamaño: {riskAmount * leverage} USDT</p>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Margen:</span>
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase">Modo Margen</label>
                 <select 
                   value={marginMode}
                   onChange={(e) => setMarginMode(e.target.value)}
-                  className="bg-surface border border-border rounded px-2 py-0.5 text-white text-xs"
+                  className="w-full bg-surface border border-border rounded px-2 py-1.5 text-white text-xs mt-1"
                 >
                   <option value="isolated">Aislado</option>
                   <option value="cross">Cruzado</option>
                 </select>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Apalancamiento:</span>
-                <span className="font-mono text-accent">{leverage}x</span>
+            </div>
+
+            {/* Valores del análisis */}
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-gray-400">Par:</span>
+                <span className="font-mono text-white">{selectedSymbol}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
+              <div className="flex justify-between py-1.5 border-b border-border">
                 <span className="text-gray-400">Entrada:</span>
                 <input 
                   type="number"
-                  value={entryPrice || analysisData?.analysis?.last_price || ''}
+                  value={entryPrice || ''}
                   onChange={(e) => setEntryPrice(Number(e.target.value))}
                   className="bg-surface border border-border rounded px-2 py-0.5 text-white font-mono text-xs w-28 text-right"
                 />
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Entrada Sugerida:</span>
-                <span className="font-mono text-green-400">${analysisData?.analysis?.last_price?.toLocaleString() || '---'}</span>
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-gray-400">Stop Loss:</span>
+                <input 
+                  type="number"
+                  value={slPrice || ''}
+                  onChange={(e) => setSlPrice(Number(e.target.value))}
+                  className="bg-surface border border-border rounded px-2 py-0.5 text-short font-mono text-xs w-28 text-right"
+                />
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Zonas de Entrada:</span>
-                <span className="font-mono text-yellow-400 text-xs">
-                  {analysisData?.analysis?.entry_zones?.map(z => z.toFixed(2)).join(' / ') || '---'}
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-gray-400">Take Profit:</span>
+                <input 
+                  type="number"
+                  value={tpPrice || ''}
+                  onChange={(e) => setTpPrice(Number(e.target.value))}
+                  className="bg-surface border border-border rounded px-2 py-0.5 text-long font-mono text-xs w-28 text-right"
+                />
+              </div>
+            </div>
+
+            {/* Resumen de riesgo */}
+            <div className="mt-4 p-3 bg-surface/50 rounded-lg">
+              <div className="flex justify-between text-xs mb-2">
+                <span className="text-gray-500">Pérdida máx. si SL:</span>
+                <span className="font-mono text-short">
+                  {entryPrice && slPrice ? 
+                    Math.abs(((entryPrice - slPrice) / entryPrice) * riskAmount * leverage).toFixed(2) 
+                    : '---'} USDT
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Stop Loss:</span>
-                <span className="font-mono text-short">${slPrice?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Take Profit:</span>
-                <span className="font-mono text-long">${tpPrice?.toLocaleString() || riskResult?.plan?.tp1 || '---'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Cantidad:</span>
-                <span className="font-mono text-white">{riskResult?.position?.position_size?.toFixed(4) || '---'} {selectedSymbol?.split('/')[0]}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-gray-400">Modo:</span>
-                <span className="text-short text-xs font-bold">REAL</span>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Ganancia máx. si TP:</span>
+                <span className="font-mono text-long">
+                  {entryPrice && tpPrice ? 
+                    Math.abs(((tpPrice - entryPrice) / entryPrice) * riskAmount * leverage).toFixed(2) 
+                    : '---'} USDT
+                </span>
               </div>
             </div>
 
             <div className="mt-4 flex gap-2">
               <button 
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-2 bg-white/5 border border-border rounded-lg text-xs font-medium hover:bg-white/10"
+                className="flex-1 py-2.5 bg-white/5 border border-border rounded-lg text-xs font-medium hover:bg-white/10"
               >
                 Cancelar
               </button>
@@ -429,13 +484,14 @@ const App = () => {
                   setShowConfirmModal(false);
                   executeTrade();
                 }}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold ${
-                  analysisData?.analysis?.bias === 'Alcista' 
+                disabled={executing}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold ${
+                  currentTradeSide === 'buy' 
                     ? 'bg-long text-black hover:opacity-90' 
                     : 'bg-short text-white hover:opacity-90'
-                }`}
+                } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Confirmar
+                {executing ? 'Ejecutando...' : 'Confirmar'}
               </button>
             </div>
           </div>

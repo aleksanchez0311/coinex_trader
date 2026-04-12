@@ -304,6 +304,44 @@ class AnalysisEngine:
 
         checks_passed = sum(checks.values())
 
+        support = min(liquidity["lows"]) if liquidity["lows"] else last_price - atr * 2
+        resistance = (
+            max(liquidity["highs"]) if liquidity["highs"] else last_price + atr * 2
+        )
+
+        invalidation = (
+            support - (atr * 1.5) if bias == "Alcista" else resistance + (atr * 1.5)
+        )
+
+        tp_distance = sl_data["sl_distance"] * 2
+        tp1 = (
+            last_price + tp_distance if bias == "Alcista" else last_price - tp_distance
+        )
+        tp2 = (
+            last_price + (tp_distance * 2)
+            if bias == "Alcista"
+            else last_price - (tp_distance * 2)
+        )
+
+        rr_ratio = round(tp_distance / sl_data["sl_distance"], 2)
+
+        trading_plan = self._generate_trading_plan(
+            bias=bias,
+            last_price=last_price,
+            support=support,
+            resistance=resistance,
+            invalidation=invalidation,
+            sl_data=sl_data,
+            tp1=tp1,
+            tp2=tp2,
+            rr_ratio=rr_ratio,
+            atr=atr,
+            checks_passed=checks_passed,
+            total_checks=len(checks),
+            liquidity=liquidity,
+            volume=volume,
+        )
+
         return {
             "bias": bias,
             "trend_detail": structure_signal.get("trend", "Neutral"),
@@ -327,4 +365,199 @@ class AnalysisEngine:
             else "MEDIA PROBABILIDAD"
             if checks_passed >= 3
             else "BAJA PROBABILIDAD - NO OPERAR",
+            "trading_plan": trading_plan,
+            "support": round(support, 2),
+            "resistance": round(resistance, 2),
+            "invalidation": round(invalidation, 2),
+        }
+
+    def _generate_trading_plan(
+        self,
+        bias,
+        last_price,
+        support,
+        resistance,
+        invalidation,
+        sl_data,
+        tp1,
+        tp2,
+        rr_ratio,
+        atr,
+        checks_passed,
+        total_checks,
+        liquidity,
+        volume,
+    ):
+        """Genera el plan operativo completo de trading"""
+
+        soporte = (
+            min(liquidity.get("lows", []))
+            if liquidity.get("lows")
+            else last_price - atr * 2
+        )
+        resistencia = (
+            max(liquidity.get("highs", []))
+            if liquidity.get("highs")
+            else last_price + atr * 2
+        )
+        entrada_long = round(resistencia + atr * 0.5, 2)
+        entrada_short = round(soporte - atr * 0.5, 2)
+
+        sl_long = round(soporte - atr * 1.5, 2)
+        sl_short = round(resistencia + atr * 1.5, 2)
+
+        tp1_long = round(entrada_long + (entrada_long - sl_long) * 2, 2)
+        tp1_short = round(entrada_short - (sl_short - entrada_short) * 2, 2)
+
+        tp2_long = round(entrada_long + (entrada_long - sl_long) * 3, 2)
+        tp2_short = round(entrada_short - (sl_short - entrada_short) * 3, 2)
+
+        long_rr = (
+            round((tp1_long - entrada_long) / (entrada_long - sl_long), 2)
+            if entrada_long > sl_long
+            else 0
+        )
+        short_rr = (
+            round((entrada_short - tp1_short) / (sl_short - entrada_short), 2)
+            if sl_short > entrada_short
+            else 0
+        )
+
+        if bias == "Neutral" or checks_passed < 3:
+            return {
+                "sesgo_principal": "NO TRADE",
+                "por_que": f"Bias Neutral ({bias}) o checks insuficientes ({checks_passed}/{total_checks}). Esperar confirmación clara.",
+                "entry_ideal": None,
+                "entry_alternativa": None,
+                "stop_loss": {
+                    "nivel": round(invalidation, 2),
+                    "logica": f"Invalidación estructura + 1.5x ATR (${round(atr * 1.5, 2)})",
+                    "distancia_pct": f"{sl_data['sl_pct']}%",
+                },
+                "take_profits": [],
+                "riesgo_beneficio": None,
+                "condiciones_minimas": "Esperar: Sesgo claro (Alcista/Bajista), mínimo 4/6 checks pasados, estructura confirmada",
+                "soporte": round(soporte, 2),
+                "resistencia": round(resistencia, 2),
+                "invalidation": round(invalidation, 2),
+                "zonas_liquidez": {
+                    "soportes": [round(l, 2) for l in liquidity.get("lows", [])],
+                    "resistencias": [round(h, 2) for h in liquidity.get("highs", [])],
+                },
+                "escenarios_alternativos": {
+                    "long": {
+                        "activo": True,
+                        "entry": entrada_long,
+                        "sl": sl_long,
+                        "tp1": tp1_long,
+                        "tp2": tp2_long,
+                        "rr": f"1:{long_rr}",
+                        "condiciones": f"Si precio rompe y cierra above ${resistencia} con volumen, entry en ${entrada_long}",
+                    },
+                    "short": {
+                        "activo": True,
+                        "entry": entrada_short,
+                        "sl": sl_short,
+                        "tp1": tp1_short,
+                        "tp2": tp2_short,
+                        "rr": f"1:{short_rr}",
+                        "condiciones": f"Si precio rechaza en ${resistencia} y cae below ${soporte}, entry en ${entrada_short}",
+                    },
+                },
+            }
+
+        if bias == "Alcista":
+            entry_ideal = round(last_price - (atr * 0.5), 2)
+            entry_alternativa = round(last_price + (atr * 0.5), 2)
+            sesgo = "LONG"
+            por_qué = f"EMA bullish stack (EMA20>EMA50>EMA200), RSI zona neutra ({round(atr, 2)}), estructura {checks_passed}/{total_checks} checks OK, volumen {volume.get('signal', 'N/A')}"
+        else:
+            entry_ideal = round(last_price + (atr * 0.5), 2)
+            entry_alternativa = round(last_price - (atr * 0.5), 2)
+            sesgo = "SHORT"
+            por_qué = f"EMA bearish stack (EMA20<EMA50<EMA200), RSI zona neutra ({round(atr, 2)}), estructura {checks_passed}/{total_checks} checks OK, volumen {volume.get('signal', 'N/A')}"
+
+        return {
+            "sesgo_principal": sesgo,
+            "por_que": por_qué,
+            "entry_ideal": entry_ideal,
+            "entry_alternativa": entry_alternativa,
+            "stop_loss": {
+                "nivel": round(sl_data["sl_price"], 2),
+                "logica": f"SL por ATR (1.5x = ${round(sl_data['sl_distance'], 2)})",
+                "distancia_pct": f"{sl_data['sl_pct']}%",
+            },
+            "take_profits": [
+                {"tp": "TP1", "nivel": round(tp1, 2), "rr": 1},
+                {"tp": "TP2", "nivel": round(tp2, 2), "rr": 2},
+            ],
+            "riesgo_beneficio": f"1:{rr_ratio}",
+            "condiciones_minimas": f"R:R mínimo 1.5 (act: 1:{rr_ratio}), checks: {checks_passed}/{total_checks}",
+            "soporte": round(soporte, 2),
+            "resistencia": round(resistencia, 2),
+            "invalidation": round(invalidation, 2),
+            "zonas_liquidez": {
+                "soportes": [round(l, 2) for l in liquidity.get("lows", [])],
+                "resistencias": [round(h, 2) for h in liquidity.get("highs", [])],
+            },
+            "escenarios_alternativos": {
+                "long": {
+                    "activo": sesgo == "LONG",
+                    "entry": entry_ideal,
+                    "sl": sl_data["sl_price"],
+                    "tp1": tp1,
+                    "tp2": tp2,
+                    "rr": f"1:{rr_ratio}",
+                    "condiciones": "Setup confirmado - Entry ideal"
+                    if sesgo == "LONG"
+                    else "Esperar ruptura above resistencia",
+                },
+                "short": {
+                    "activo": sesgo == "SHORT",
+                    "entry": entry_ideal,
+                    "sl": sl_data["sl_price"],
+                    "tp1": tp2 if sesgo == "SHORT" else tp1,
+                    "tp2": tp1 if sesgo == "SHORT" else tp2,
+                    "rr": f"1:{rr_ratio}",
+                    "condiciones": "Setup confirmado - Entry ideal"
+                    if sesgo == "SHORT"
+                    else "Esperar rechazo en resistencia",
+                },
+            },
+        }
+
+        if bias == "Alcista":
+            entry_ideal = round(last_price - (atr * 0.5), 2)
+            entry_alternativa = round(last_price + (atr * 0.5), 2)
+            sesgo = "LONG"
+            por_qué = f"EMA bullish stack (EMA20>EMA50>EMA200), RSI zona neutra ({round(atr, 2)}), estructura {checks_passed}/{total_checks} checks OK, volumen {volume.get('signal', 'N/A')}"
+        else:
+            entry_ideal = round(last_price + (atr * 0.5), 2)
+            entry_alternativa = round(last_price - (atr * 0.5), 2)
+            sesgo = "SHORT"
+            por_qué = f"EMA bearish stack (EMA20<EMA50<EMA200), RSI zona neutra ({round(atr, 2)}), estructura {checks_passed}/{total_checks} checks OK, volumen {volume.get('signal', 'N/A')}"
+
+        return {
+            "sesgo_principal": sesgo,
+            "por_que": por_qué,
+            "entry_ideal": entry_ideal,
+            "entry_alternativa": entry_alternativa,
+            "stop_loss": {
+                "nivel": round(sl_data["sl_price"], 2),
+                "logica": f"SL por ATR (1.5x = ${round(sl_data['sl_distance'], 2)})",
+                "distancia_pct": f"{sl_data['sl_pct']}%",
+            },
+            "take_profits": [
+                {"tp": "TP1", "nivel": round(tp1, 2), "rr": 1},
+                {"tp": "TP2", "nivel": round(tp2, 2), "rr": 2},
+            ],
+            "riesgo_beneficio": f"1:{rr_ratio}",
+            "condiciones_minimas": f"R:R mínimo 1.5 (act: 1:{rr_ratio}), checks: {checks_passed}/{total_checks}",
+            "soporte": round(support, 2),
+            "resistencia": round(resistance, 2),
+            "invalidation": round(invalidation, 2),
+            "zonas_liquidez": {
+                "soportes": [round(l, 2) for l in liquidity.get("lows", [])],
+                "resistencias": [round(h, 2) for h in liquidity.get("highs", [])],
+            },
         }
