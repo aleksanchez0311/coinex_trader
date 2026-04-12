@@ -1,8 +1,23 @@
 import React from 'react';
-import { Target, Activity, Zap, BarChart3, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle } from 'lucide-react';
+import { Target, Activity, Zap, BarChart3, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle, Play, RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const AnalysisBoard = ({ symbol, data, loading, analysisStep }) => {
+const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnalyzed, isFromCache }) => {
+  if (!hasAnalyzed) return (
+    <div className="glass p-6 md:p-10 flex flex-col items-center justify-center gap-4 min-h-[400px] md:min-h-[500px]">
+      <Zap size={48} className="text-gray-600" />
+      <p className="text-gray-400 font-bold uppercase text-xs">Selecciona un mercado y presiona analizar</p>
+      <button 
+        onClick={onAnalyze}
+        disabled={loading}
+        className="mt-4 flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent/80 disabled:opacity-50 rounded-lg font-bold text-sm uppercase transition-colors"
+      >
+        <Play size={16} />
+        Analizar {symbol}
+      </button>
+    </div>
+  );
+
   if (loading) return (
     <div className="glass p-6 md:p-10 flex flex-col items-center justify-center gap-4 min-h-[400px] md:min-h-[500px]">
       <motion.div 
@@ -83,6 +98,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep }) => {
           <div className="flex justify-between items-start mb-3 md:mb-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
               <Zap size={14} className="text-accent" /> Bias & Confluencias
+              {isFromCache && <span className="text-[10px] text-amber-500 ml-1">(cache)</span>}
             </h3>
             <span className="text-[10px] font-mono bg-white/5 px-2 py-1 rounded text-gray-400 border border-border">
               {symbol}
@@ -141,6 +157,18 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep }) => {
             ))}
           </div>
         </div>
+      </div>
+      
+      {/* Botón de actualizar análisis */}
+      <div className="flex justify-center">
+        <button 
+          onClick={onAnalyze}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-surface hover:bg-surface/80 disabled:opacity-50 rounded-lg text-xs font-bold uppercase text-gray-400 transition-colors border border-border"
+        >
+          <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Actualizando...' : 'Actualizar Análisis'}
+        </button>
       </div>
     </motion.div>
   );

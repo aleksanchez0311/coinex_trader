@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-const PlanOperativoModal = ({ isOpen, onClose, tradingPlan, onOpenTrade }) => {
+const PlanOperativoModal = ({ isOpen, onClose, tradingPlan, symbol, onOpenTrade }) => {
   if (!isOpen || !tradingPlan) return null;
 
   const isLong = tradingPlan.sesgo_principal === 'LONG';
@@ -25,7 +25,7 @@ const PlanOperativoModal = ({ isOpen, onClose, tradingPlan, onOpenTrade }) => {
               <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>
               <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>
             </svg>
-            <h3 className="font-semibold text-lg text-white uppercase tracking-wide">Plan Operativo</h3>
+            <h3 className="font-semibold text-lg text-white uppercase tracking-wide">Plan Operativo <span className="text-accent">{symbol}</span></h3>
             <span className={`px-3 py-1 rounded-md text-xs font-semibold uppercase ${getStateClass()}`}>
               {tradingPlan.sesgo_principal}
             </span>
@@ -90,7 +90,7 @@ const PlanOperativoModal = ({ isOpen, onClose, tradingPlan, onOpenTrade }) => {
                 </div>
                 {tradingPlan.escenarios_alternativos.long?.activo && (
                   <button 
-                    onClick={() => { onClose(); onOpenTrade({...tradingPlan.escenarios_alternativos.long, sesgo_principal: 'LONG', por_que: 'Escenario LONG'}); }} 
+                    onClick={() => { onOpenTrade({...tradingPlan.escenarios_alternativos.long, sesgo_principal: 'LONG', por_que: 'Escenario LONG'}); }} 
                     className="w-full mt-4 py-3 bg-long text-background font-semibold rounded-md hover:brightness-110 transition-all"
                   >
                     Abrir LONG
@@ -126,7 +126,7 @@ const PlanOperativoModal = ({ isOpen, onClose, tradingPlan, onOpenTrade }) => {
                 </div>
                 {tradingPlan.escenarios_alternativos.short?.activo && (
                   <button 
-                    onClick={() => { onClose(); onOpenTrade({...tradingPlan.escenarios_alternativos.short, sesgo_principal: 'SHORT', por_que: 'Escenario SHORT'}); }} 
+                    onClick={() => { onOpenTrade({...tradingPlan.escenarios_alternativos.short, sesgo_principal: 'SHORT', por_que: 'Escenario SHORT'}); }} 
                     className="w-full mt-4 py-3 bg-short text-white font-semibold rounded-md hover:brightness-110 transition-all"
                   >
                     Abrir SHORT

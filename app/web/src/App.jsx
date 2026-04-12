@@ -20,6 +20,9 @@ const App = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisStep, setAnalysisStep] = useState('');
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [isFromCache, setIsFromCache] = useState(false);
+  const [autoAnalyzeEnabled, setAutoAnalyzeEnabled] = useState(false);
   const [pnlStats, setPnlStats] = useState({ total_pnl: 0, count: 0 });
   const [pnlLoading, setPnlLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,6 +107,26 @@ const App = () => {
     localStorage.setItem('trader_creds', JSON.stringify(newCreds));
   };
 
+  const saveAnalysisCache = (symbol, data) => {
+    try {
+      const cache = JSON.parse(localStorage.getItem('analysis_cache') || '{}');
+      cache[symbol] = { data, timestamp: Date.now() };
+      localStorage.setItem('analysis_cache', JSON.stringify(cache));
+    } catch (e) {
+      console.error("Error saving analysis cache:", e);
+    }
+  };
+
+  const loadAnalysisCache = (symbol) => {
+    try {
+      const cache = JSON.parse(localStorage.getItem('analysis_cache') || '{}');
+      return cache[symbol]?.data || null;
+    } catch (e) {
+      console.error("Error loading analysis cache:", e);
+      return null;
+    }
+  };
+
   const fetchAnalysis = async (symbol) => {
     setIsLoading(true);
     setAnalysisStep(`Conectando con OKX • Descargando velas 1h de ${symbol}...`);
@@ -122,12 +145,14 @@ const App = () => {
       const data = await response.json();
       
       setAnalysisData(data);
+      saveAnalysisCache(symbol, data);
       setAnalysisStep(`Análisis completo • Score: ${data?.scoring?.total_score || '...'}/100`);
     } catch (error) {
       console.error("Error fetching analysis:", error);
     } finally {
       setIsLoading(false);
       setAnalysisStep('');
+      setIsFromCache(false);
     }
   };
 
@@ -236,23 +261,37 @@ const App = () => {
       alert(`Error de ejecución: ${e.message || "Error de conexión"}`);
     } finally {
       setExecuting(false);
+      setShowConfirmModal(false);
     }
   };
 
   useEffect(() => {
-    if (selectedSymbol) {
-      fetchAnalysis(selectedSymbol);
-      setTpPrice(0);
-      setSlPrice(0);
-      setRiskResult(null);
-      setCapital(30);
-      setRiskPct(50);
-      setLeverage(20);
-      setEntryPrice(null);
-      setRiskAmount(21);
-      setCurrentTradeSide(null);
+    const cachedData = loadAnalysisCache(selectedSymbol);
+    if (cachedData) {
+      setAnalysisData(cachedData);
+      setHasAnalyzed(true);
+      setIsFromCache(true);
+    } else {
+      setAnalysisData(null);
+      setHasAnalyzed(false);
+      setIsFromCache(false);
     }
+    setTpPrice(0);
+    setSlPrice(0);
+    setRiskResult(null);
+    setCapital(30);
+    setRiskPct(50);
+    setLeverage(20);
+    setEntryPrice(null);
+    setRiskAmount(21);
+    setCurrentTradeSide(null);
   }, [selectedSymbol]);
+  
+  useEffect(() => {
+    if (autoAnalyzeEnabled && !hasAnalyzed && analysisData) {
+      fetchAnalysis(selectedSymbol);
+    }
+  }, [selectedSymbol, autoAnalyzeEnabled, hasAnalyzed, analysisData]);
 
   useEffect(() => {
     if (analysisData?.risk_recommendations) {
@@ -271,27 +310,15 @@ const App = () => {
     }
   }, [analysisData]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && selectedSymbol) {
-        fetchAnalysis(selectedSymbol);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [selectedSymbol]);
-
   const handleOpenTrade = (tradingPlan) => {
     if (tradingPlan && tradingPlan.sesgo_principal !== 'NO TRADE') {
-      setCurrentTradeSide(tradingPlan.sesgo_principal === 'LONG' ? 'buy' : 'sell');
-      setEntryPrice(tradingPlan.entry || tradingPlan.entry_ideal || analysisData.analysis.last_price);
-      setSlPrice(tradingPlan.sl || tradingPlan.stop_loss?.nivel);
-      if (tradingPlan.tp1) {
-        setTpPrice(tradingPlan.tp1);
-      } else if (tradingPlan.take_profits?.[0]?.nivel) {
-        setTpPrice(tradingPlan.take_profits[0].nivel);
-      }
+      const isLong = tradingPlan.sesgo_principal === 'LONG';
+      const scenario = isLong ? tradingPlan.escenarios_alternativos?.long : tradingPlan.escenarios_alternativos?.short;
+      
+      setCurrentTradeSide(isLong ? 'buy' : 'sell');
+      setEntryPrice(tradingPlan.entry_ideal || tradingPlan.entry || analysisData.analysis.last_price);
+      setSlPrice(scenario?.sl || tradingPlan.stop_loss?.nivel);
+      setTpPrice(scenario?.tp1 || tradingPlan.take_profits?.[0]?.nivel);
       setLeverage(20);
       setRiskAmount(Math.round(capital * 0.7));
       setRiskPct(50);
@@ -339,24 +366,36 @@ const App = () => {
                     loading={isLoading}
                     analysisStep={analysisStep}
                     onOpenTrade={handleOpenTrade}
+                    onAnalyze={() => {
+                      setAutoAnalyzeEnabled(true);
+                      setIsFromCache(false);
+                      setHasAnalyzed(true);
+                      fetchAnalysis(selectedSymbol);
+                    }}
+                    hasAnalyzed={hasAnalyzed}
+                    isFromCache={isFromCache}
                   />
                 </div>
               </div>
 
               {/* Botones de Plan Operativo e Información Avanzada */}
-              <PlanOperativoButton 
-                analysisData={analysisData}
-                loading={isLoading}
-                onOpenPlanModal={(plan) => {
-                  setCurrentTradingPlan(plan);
-                  setShowPlanModal(true);
-                }}
-              />
-              
-              <InfoAvanzadaButton 
-                analysisData={analysisData}
-                loading={isLoading}
-              />
+              {hasAnalyzed && (
+                <>
+                  <PlanOperativoButton 
+                    analysisData={analysisData}
+                    loading={isLoading}
+                    onOpenPlanModal={(plan) => {
+                      setCurrentTradingPlan(plan);
+                      setShowPlanModal(true);
+                    }}
+                  />
+                  
+                  <InfoAvanzadaButton 
+                    analysisData={analysisData}
+                    loading={isLoading}
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -388,6 +427,7 @@ const App = () => {
         isOpen={showPlanModal}
         onClose={() => { setShowPlanModal(false); setCurrentTradingPlan(null); }}
         tradingPlan={currentTradingPlan}
+        symbol={selectedSymbol}
         onOpenTrade={handleOpenTrade}
       />
 
@@ -395,6 +435,7 @@ const App = () => {
         isOpen={showAdvancedModal}
         onClose={() => setShowAdvancedModal(false)}
         analysisData={analysisData}
+        symbol={selectedSymbol}
       />
 
       <ConfirmOrderModal 
@@ -418,6 +459,7 @@ const App = () => {
         currentTradeSide={currentTradeSide}
         executing={executing}
         onConfirm={executeTrade}
+        tradingPlan={analysisData?.analysis?.trading_plan}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Target, ShieldAlert } from 'lucide-react';
 
 const ConfirmOrderModal = ({ 
   isOpen, 
@@ -21,11 +21,16 @@ const ConfirmOrderModal = ({
   setRiskAmount,
   currentTradeSide,
   executing,
-  onConfirm
+  onConfirm,
+  tradingPlan
 }) => {
   if (!isOpen) return null;
 
   const isLong = currentTradeSide === 'buy';
+
+  const scenario = isLong ? tradingPlan?.escenarios_alternativos?.long : tradingPlan?.escenarios_alternativos?.short;
+  const tps = scenario ? [scenario.tp1, scenario.tp2, scenario.tp3] : [];
+  const sls = scenario ? [scenario.sl, scenario.entry - (scenario.entry - scenario.sl) * 0.5, scenario.entry + (scenario.sl - scenario.entry) * 0.5] : [];
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-3" style={{ backgroundColor: 'transparent' }}>
@@ -113,23 +118,57 @@ const ConfirmOrderModal = ({
               className="bg-surface border border-border rounded px-2 md:px-3 py-1.5 font-data text-textPrimary text-sm w-24 md:w-32 text-right focus:border-long focus:outline-none"
             />
           </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-sm text-neutral">Stop Loss</span>
-            <input 
-              type="number"
-              value={slPrice || ''}
-              onChange={(e) => setSlPrice(Number(e.target.value))}
-              className="bg-surface border border-border rounded px-2 md:px-3 py-1.5 font-data text-short text-sm w-24 md:w-32 text-right focus:border-short focus:outline-none"
-            />
+          
+          {/* Stop Loss con botones rápidos */}
+          <div className="py-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-neutral flex items-center gap-1">
+                <ShieldAlert size={14} /> Stop Loss
+              </span>
+              <input 
+                type="number"
+                value={slPrice || ''}
+                onChange={(e) => setSlPrice(Number(e.target.value))}
+                className="bg-surface border border-border rounded px-2 md:px-3 py-1.5 font-data text-short text-sm w-24 md:w-32 text-right focus:border-short focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-1">
+              {sls.map((sl, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSlPrice(sl)}
+                  className="flex-1 py-1 px-2 text-[10px] bg-surface hover:bg-surface-elevated border border-border rounded text-short font-data transition-colors"
+                >
+                  SL{i + 1}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-sm text-neutral">Take Profit</span>
-            <input 
-              type="number"
-              value={tpPrice || ''}
-              onChange={(e) => setTpPrice(Number(e.target.value))}
-              className="bg-surface border border-border rounded px-2 md:px-3 py-1.5 font-data text-long text-sm w-24 md:w-32 text-right focus:border-long focus:outline-none"
-            />
+
+          {/* Take Profit con botones rápidos */}
+          <div className="py-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-neutral flex items-center gap-1">
+                <Target size={14} /> Take Profit
+              </span>
+              <input 
+                type="number"
+                value={tpPrice || ''}
+                onChange={(e) => setTpPrice(Number(e.target.value))}
+                className="bg-surface border border-border rounded px-2 md:px-3 py-1.5 font-data text-long text-sm w-24 md:w-32 text-right focus:border-long focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-1">
+              {tps.map((tp, i) => (
+                <button
+                  key={i}
+                  onClick={() => setTpPrice(tp)}
+                  className="flex-1 py-1 px-2 text-[10px] bg-surface hover:bg-surface-elevated border border-border rounded text-long font-data transition-colors"
+                >
+                  TP{i + 1}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

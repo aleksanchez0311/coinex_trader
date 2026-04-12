@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-const InfoAvanzadaModal = ({ isOpen, onClose, analysisData }) => {
+const InfoAvanzadaModal = ({ isOpen, onClose, analysisData, symbol }) => {
   if (!isOpen || !analysisData) return null;
 
   const { analysis } = analysisData;
@@ -18,7 +18,7 @@ const InfoAvanzadaModal = ({ isOpen, onClose, analysisData }) => {
               <path d="M13 17V5"/>
               <path d="M8 17v-3"/>
             </svg>
-            <h3 className="font-semibold text-lg text-white uppercase tracking-wide">Información Avanzada</h3>
+            <h3 className="font-semibold text-lg text-white uppercase tracking-wide">Información Avanzada <span className="text-accent">{symbol}</span></h3>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-elevated transition-colors">
             <X size={20} className="text-neutral" />

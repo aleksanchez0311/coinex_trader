@@ -1,109 +1,106 @@
 import React from 'react';
-import { Zap, Target, BarChart3, Info, Clock, TrendingUp, ShieldAlert, Volume2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Zap, Target, BarChart3, Info, TrendingUp, ShieldAlert, Volume2, CheckCircle, AlertCircle, LineChart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const StrategyView = () => {
   const sections = [
     {
-      title: "1. Contexto de Sesión",
-      icon: Clock,
-      color: "text-purple-400",
-      bg: "bg-purple-500/10",
-      items: [
-        { label: "🟣 Asia", desc: "Movimiento lento, menor volatilidad" },
-        { label: "🔵 Londres", desc: "Movimiento fuerte, alta liquidez" },
-        { label: "🔴 New York", desc: "Máxima volatilidad y manipulación" },
-        { label: "✅ Mejores setups", desc: "Apertura Londres + Apertura NY" }
-      ]
-    },
-    {
-      title: "2. Liquidez (SMC)",
+      title: "1. Estructura de Mercado (SMC)",
       icon: TrendingUp,
       color: "text-blue-400",
       bg: "bg-blue-500/10",
       items: [
-        { label: "✓ Identificar stops", desc: "Máximos/mínimos anteriores" },
-        { label: "✓ Zonas de liquidez", desc: "Equal highs/lows, stop clusters" },
-        { label: "→ Regla clave", desc: "Precio va a liquidez primero, luego movimiento real" }
+        { label: "Swings", desc: "Highs y Lows del precio" },
+        { label: "BOS", desc: "Break of Structure → Continuidad" },
+        { label: "CHOCH", desc: "Change of Character → Giro" }
       ]
     },
     {
-      title: "3. Estructura Real",
+      title: "2. Liquidez",
       icon: Zap,
       color: "text-accent",
       bg: "bg-accent/10",
       items: [
-        { label: "BOS", desc: "Break of Structure → Continuación" },
-        { label: "CHOCH", desc: "Change of Character → Posible giro" },
-        { label: "Entrada PRO", desc: "Liquidez barrida + CHoCH + Order Block" }
+        { label: "Equal Highs", desc: "Máximos iguales" },
+        { label: "Equal Lows", desc: "Mínimos iguales" },
+        { label: "Stop Clusters", desc: "Agrupaciones de stops" }
       ]
     },
     {
-      title: "4. Multi-Timeframe",
-      icon: BarChart3,
+      title: "3. Zonas de Entrada",
+      icon: Target,
+      color: "text-purple-400",
+      bg: "bg-purple-500/10",
+      items: [
+        { label: "OB Alcista", desc: "Bloque de ordenes bullish" },
+        { label: "OB Bajista", desc: "Bloque de ordenes bearish" },
+        { label: "FVG", desc: "Fair Value Gap (brecha)" }
+      ]
+    },
+    {
+      title: "4. Tendencia EMA",
+      icon: LineChart,
       color: "text-green-400",
       bg: "bg-green-500/10",
       items: [
-        { label: "1H o 15M", desc: "Determinar dirección de tendencia" },
-        { label: "5M o 1M", desc: "Timing fino de entrada" },
-        { label: "Ejemplo", desc: "15M alcista + retroceso a OB en 5M = entrada" }
+        { label: "EMA20", desc: "Media móvil rápida" },
+        { label: "EMA50", desc: "Media móvil media" },
+        { label: "EMA200", desc: "Media móvil lenta" }
       ]
     },
     {
-      title: "5. Volumen",
-      icon: Volume2,
+      title: "5. RSI",
+      icon: BarChart3,
       color: "text-orange-400",
       bg: "bg-orange-500/10",
       items: [
-        { label: "✓ Volumen alto", desc: "Ruptura válida = movimiento real" },
-        { label: "❌ Volumen bajo", desc: "Posible fakeout" }
+        { label: "Zona neutra", desc: "40-60" },
+        { label: "Sobrecompra", desc: ">70" },
+        { label: "Sobreventa", desc: "<30" }
       ]
     },
     {
-      title: "6. Gestión de Riesgo",
+      title: "6. ATR (Stop Loss)",
       icon: ShieldAlert,
       color: "text-red-400",
       bg: "bg-red-500/10",
       items: [
-        { label: "Riesgo máx", desc: "1-2% por trade" },
-        { label: "SL obligatorio", desc: "Nunca operar sin stop loss" },
-        { label: "SL basado en", desc: "ATR (Average True Range)" },
-        { label: "TP mínimo", desc: "2R (el doble del riesgo)" }
+        { label: "SL basado en ATR", desc: "Average True Range" },
+        { label: "Distancia", desc: "2xATR del precio" },
+        { label: "Liquidation buffer", desc: ">30% del SL" }
       ]
     },
     {
-      title: "7. Ratio Riesgo/Beneficio",
+      title: "7. Ratio R:R",
       icon: Target,
       color: "text-yellow-400",
       bg: "bg-yellow-500/10",
       items: [
-        { label: "NO operar si", desc: "RR < 1:2" },
-        { label: "Ideal", desc: "1:2 o 1:3" }
+        { label: "TP1", desc: "1.5R" },
+        { label: "TP2", desc: "2.5R" },
+        { label: "TP3", desc: "4.0R" }
       ]
     },
     {
-      title: "8. Filtros de NO Operación",
-      icon: AlertCircle,
-      color: "text-gray-400",
-      bg: "bg-gray-500/10",
+      title: "8. Volumen",
+      icon: Volume2,
+      color: "text-cyan-400",
+      bg: "bg-cyan-500/10",
       items: [
-        { label: "❌ EMAs enredadas", desc: "Sin tendencia clara" },
-        { label: "❌ Mercado lateral", desc: "Sin estructura definida" },
-        { label: "❌ Noticias fuertes", desc: "Alta volatilidad impredecible" },
-        { label: "❌ Sin liquidez", desc: "No hay zonas claras de stops" }
+        { label: "Alto volumen", desc: "Ruptura válida" },
+        { label: "Bajo volumen", desc: "Posible fakeout" }
       ]
     }
   ];
 
   const checklist = [
-    "Tendencia clara (EMA + estructura)",
-    "Liquidez identificada y validada",
-    "OB o FVG válido en zona de interés",
-    "Confirmación: BOS o CHoCH",
-    "RSI en zona correcta (40-60)",
-    "RR mínimo 1:2",
-    "SL definido basado en ATR",
-    "Volumen confirmado en ruptura"
+    "Tendencia EMA (stack alineado: EMA20 > EMA50 > EMA200)",
+    "Estructura BOS validada",
+    "Liquidez identificada y barrida",
+    "OB o FVG presente en zona de interés",
+    "RSI en zona neutra (40-60)",
+    "Volumen confirmado en movimiento",
+    "R:R mínimo 1:1.5"
   ];
 
   const psychologyRules = [
@@ -120,8 +117,8 @@ const StrategyView = () => {
           <BarChart3 size={28} />
         </div>
         <div>
-          <h2 className="text-2xl font-bold">Estrategia Intradía Pro</h2>
-          <p className="text-gray-400 text-sm">SMC + EMA + RSI + ATR</p>
+          <h2 className="text-2xl font-bold">Estrategia SMC + EMA + RSI + ATR</h2>
+          <p className="text-gray-400 text-sm">Metodología de análisis intradía</p>
         </div>
       </div>
 
@@ -132,7 +129,7 @@ const StrategyView = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
             key={i} 
-            className={`glass p-4 border ${section.color.replace('text-', 'border-')}/20 hover:border-${section.color.replace('text-', '')}/40 transition-colors`}
+            className="glass p-4 border-white/5 hover:border-white/10 transition-colors"
           >
             <div className="flex items-center gap-2 mb-3">
               <section.icon className={section.color} size={18} />
@@ -156,7 +153,7 @@ const StrategyView = () => {
           <h3 className="font-bold text-lg">Checklist Pre-Trade (ORO)</h3>
         </div>
         <p className="text-xs text-gray-500 mb-4">Si falta 1 → NO ENTRAS</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {checklist.map((item, i) => (
             <div key={i} className="flex items-start gap-2 p-2 bg-surface/50 rounded-lg">
               <div className="w-4 h-4 rounded-full border border-accent/30 flex items-center justify-center mt-0.5">
@@ -188,7 +185,6 @@ const StrategyView = () => {
             <li className="text-xs text-gray-400">• Está en la EJECUCIÓN del plan</li>
             <li className="text-xs text-gray-400">• No respetan liquidez → pierden</li>
             <li className="text-xs text-gray-400">• No esperan confirmación → pierden</li>
-            <li className="text-xs text-gray-400">• No gestionan riesgo → pierden</li>
           </ul>
         </div>
       </div>
