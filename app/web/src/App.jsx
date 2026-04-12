@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, TrendingUp, ShieldAlert, Settings, Activity, Zap, X } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, ShieldAlert, Settings, Activity, Zap, X, Layers, FileBarChart } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import MarketList from './components/MarketList';
 import AnalysisBoard from './components/AnalysisBoard';
+import { PlanOperativoButton, InfoAvanzadaButton } from './components/ActionButtons';
 
 import StrategyView from './components/StrategyView';
 import RiskManagementView from './components/RiskManagementView';
@@ -29,6 +30,7 @@ const App = () => {
   const [executing, setExecuting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [currentTradingPlan, setCurrentTradingPlan] = useState(null);
   const [marginMode, setMarginMode] = useState('isolated');
   const [orderType, setOrderType] = useState('limit');
@@ -86,6 +88,12 @@ const App = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [credentials]);
+
+  useEffect(() => {
+    const handleAdvancedModal = () => setShowAdvancedModal(true);
+    window.addEventListener('openAdvancedModal', handleAdvancedModal);
+    return () => window.removeEventListener('openAdvancedModal', handleAdvancedModal);
+  }, []);
 
   const saveCredentials = (newCreds) => {
     setCredentials(newCreds);
@@ -322,6 +330,170 @@ const App = () => {
                   />
                 </div>
               </div>
+
+              {/* Botones de Plan Operativo e Información Avanzada */}
+              <PlanOperativoButton 
+                analysisData={analysisData}
+                loading={isLoading}
+                onOpenPlanModal={(plan) => {
+                  setCurrentTradingPlan(plan);
+                  setShowPlanModal(true);
+                }}
+              />
+              
+              <InfoAvanzadaButton 
+                analysisData={analysisData}
+                loading={isLoading}
+              />
+
+              {/* Modal Plan Operativo */}
+              {showPlanModal && currentTradingPlan && (
+                <div style={{ backgroundColor: 'rgba(0,0,0,1)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+                  <div style={{ backgroundColor: '#1a1a1f', border: '2px solid rgba(0,242,255,0.3)', padding: '1.25rem', width: '100%', maxWidth: '42rem', maxHeight: '90vh', overflowY: 'auto', borderRadius: '0.75rem' }}>
+                    {/* Contenido del modal Plan Operativo - similar al original */}
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-3">
+                        <Layers size={20} className="text-accent" />
+                        <h3 className="text-base font-bold text-white uppercase">Plan Operativo (12-24h)</h3>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                          currentTradingPlan.sesgo_principal === 'LONG' ? 'bg-green-500/20 text-green-400' :
+                          currentTradingPlan.sesgo_principal === 'SHORT' ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {currentTradingPlan.sesgo_principal}
+                        </span>
+                      </div>
+                      <button onClick={() => { setShowPlanModal(false); setCurrentTradingPlan(null); }} className="text-gray-400 hover:text-white">
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <div className="mb-4 p-3 bg-surface/50 rounded-lg">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Por qué:</p>
+                      <p className="text-xs text-gray-300">{currentTradingPlan.por_que}</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="p-2 bg-green-500/5 border border-green-500/20 rounded-lg">
+                        <p className="text-[10px] text-gray-500 uppercase">Soporte</p>
+                        <p className="text-sm font-mono text-green-400">${currentTradingPlan.soporte?.toLocaleString()}</p>
+                      </div>
+                      <div className="p-2 bg-red-500/5 border border-red-500/20 rounded-lg">
+                        <p className="text-[10px] text-gray-500 uppercase">Resistencia</p>
+                        <p className="text-sm font-mono text-red-400">${currentTradingPlan.resistencia?.toLocaleString()}</p>
+                      </div>
+                      <div className="p-2 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                        <p className="text-[10px] text-gray-500 uppercase">Invalidación</p>
+                        <p className="text-sm font-mono text-cyan-400">${currentTradingPlan.invalidation?.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {currentTradingPlan.escenarios_alternativos && (
+                      <div className="mt-4 pt-4 border-t border-gray-700">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-3">Escenarios Alternativos</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                            <p className="text-xs font-bold text-green-400 uppercase mb-2">LONG</p>
+                            <div className="text-[10px] space-y-1">
+                              <div className="flex justify-between"><span className="text-gray-500">Entry:</span><span className="text-white">${currentTradingPlan.escenarios_alternativos.long?.entry?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">SL:</span><span className="text-red-400">${currentTradingPlan.escenarios_alternativos.long?.sl?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">TP1:</span><span className="text-green-400">${currentTradingPlan.escenarios_alternativos.long?.tp1?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">R:R:</span><span className="text-cyan-400">{currentTradingPlan.escenarios_alternativos.long?.rr}</span></div>
+                            </div>
+                            {currentTradingPlan.escenarios_alternativos.long?.activo && (
+                              <button onClick={() => { setShowPlanModal(false); handleOpenTrade({...currentTradingPlan.escenarios_alternativos.long, sesgo_principal: 'LONG', por_que: 'Escenario LONG'}); }} className="w-full mt-2 py-1.5 bg-green-500 text-black text-[10px] font-bold rounded">Abrir LONG</button>
+                            )}
+                          </div>
+                          <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                            <p className="text-xs font-bold text-red-400 uppercase mb-2">SHORT</p>
+                            <div className="text-[10px] space-y-1">
+                              <div className="flex justify-between"><span className="text-gray-500">Entry:</span><span className="text-white">${currentTradingPlan.escenarios_alternativos.short?.entry?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">SL:</span><span className="text-green-400">${currentTradingPlan.escenarios_alternativos.short?.sl?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">TP1:</span><span className="text-red-400">${currentTradingPlan.escenarios_alternativos.short?.tp1?.toLocaleString()}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-500">R:R:</span><span className="text-cyan-400">{currentTradingPlan.escenarios_alternativos.short?.rr}</span></div>
+                            </div>
+                            {currentTradingPlan.escenarios_alternativos.short?.activo && (
+                              <button onClick={() => { setShowPlanModal(false); handleOpenTrade({...currentTradingPlan.escenarios_alternativos.short, sesgo_principal: 'SHORT', por_que: 'Escenario SHORT'}); }} className="w-full mt-2 py-1.5 bg-red-500 text-white text-[10px] font-bold rounded">Abrir SHORT</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Información Avanzada */}
+              {showAdvancedModal && analysisData && (
+                <div style={{ backgroundColor: 'rgba(0,0,0,1)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+                  <div style={{ backgroundColor: '#1a1a1f', border: '1px solid #374151', padding: '1.25rem', width: '100%', maxWidth: '42rem', maxHeight: '90vh', overflowY: 'auto', borderRadius: '0.75rem' }}>
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-3">
+                        <FileBarChart size={20} className="text-gray-400" />
+                        <h3 className="text-base font-bold text-white uppercase">Información Avanzada</h3>
+                      </div>
+                      <button onClick={() => setShowAdvancedModal(false)} className="text-gray-400 hover:text-white">
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    {analysisData.analysis?.sl_data && (
+                      <div className="mb-4 p-3 border border-cyan-500/20 rounded-lg">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Stop Loss (ATR)</p>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div><span className="text-gray-500">Precio:</span> <span className="text-red-400">${analysisData.analysis.sl_data.sl_price}</span></div>
+                          <div><span className="text-gray-500">Dist:</span> <span className="text-white">${analysisData.analysis.sl_data.sl_distance}</span></div>
+                          <div><span className="text-gray-500">%:</span> <span className="text-white">{analysisData.analysis.sl_data.sl_pct}%</span></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {analysisData.analysis?.fvgs && analysisData.analysis.fvgs.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Fair Value Gaps</p>
+                        {analysisData.analysis.fvgs.map((fvg, i) => (
+                          <div key={i} className={`p-2 mb-1 rounded border ${fvg.type === 'Alcista' ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                            <span className={`text-[10px] font-bold ${fvg.type === 'Alcista' ? 'text-green-400' : 'text-red-400'}`}>FVG {fvg.type}</span>
+                            <span className="text-[10px] text-gray-400 ml-2">${fvg.bottom?.toFixed(2)} - ${fvg.top?.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {analysisData.analysis?.order_blocks && analysisData.analysis.order_blocks.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Order Blocks</p>
+                        {analysisData.analysis.order_blocks.map((ob, i) => (
+                          <div key={i} className="p-2 mb-1 rounded border border-gray-700 bg-white/5">
+                            <span className="text-[10px] text-white">{ob.type}</span>
+                            <span className="text-[10px] text-cyan-400 ml-2">{ob.zone}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {analysisData.analysis?.volume && (
+                      <div className="mb-4 p-3 border border-gray-700 rounded-lg">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-1">Volumen</p>
+                        <p className={`text-sm ${analysisData.analysis.volume.signal === 'Bajo' ? 'text-red-400' : analysisData.analysis.volume.signal === 'Alto' ? 'text-green-400' : 'text-gray-400'}`}>
+                          {analysisData.analysis.volume.signal} | Ratio: {analysisData.analysis.volume.ratio} | Prom: {analysisData.analysis.volume.avg_volume}
+                        </p>
+                      </div>
+                    )}
+
+                    {analysisData.derivatives?.funding && (
+                      <div className="p-3 border border-cyan-500/20 rounded-lg">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-2">Derivados</p>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div><span className="text-gray-500">Funding:</span> <span className={analysisData.derivatives.funding.current > 0 ? 'text-red-400' : 'text-green-400'}>{(analysisData.derivatives.funding.current * 100).toFixed(4)}%</span></div>
+                          <div><span className="text-gray-500">Next:</span> <span className="text-gray-400">{(analysisData.derivatives.funding.next * 100).toFixed(4)}%</span></div>
+                          <div><span className="text-gray-500">Mark:</span> <span className="text-white">${analysisData.derivatives.funding.mark_price?.toLocaleString()}</span></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
