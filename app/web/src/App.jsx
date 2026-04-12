@@ -22,6 +22,7 @@ const App = () => {
   const [analysisStep, setAnalysisStep] = useState('');
   const [pnlStats, setPnlStats] = useState({ total_pnl: 0, count: 0 });
   const [pnlLoading, setPnlLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Estado para Risk Management
   const [capital, setCapital] = useState(30);
@@ -304,10 +305,18 @@ const App = () => {
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
         selected={selectedSymbol}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
       
       <main className="flex-1 flex flex-col min-w-0">
-        <Header pnlStats={pnlStats} pnlLoading={pnlLoading} />
+        <Header 
+          pnlStats={pnlStats} 
+          pnlLoading={pnlLoading} 
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          sidebarOpen={sidebarOpen}
+          onCloseSidebar={() => setSidebarOpen(false)}
+        />
         
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'dashboard' && (
