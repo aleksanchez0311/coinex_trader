@@ -318,12 +318,12 @@ const App = () => {
           onCloseSidebar={() => setSidebarOpen(false)}
         />
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6">
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-12 gap-6">
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-6">
                 {/* Left: Market List */}
-                <div className="col-span-12 lg:col-span-4">
+                <div className="col-span-1 md:col-span-12 lg:col-span-4">
                   <MarketList 
                     selected={selectedSymbol} 
                     setSelected={setSelectedSymbol}
@@ -332,7 +332,7 @@ const App = () => {
                 </div>
 
                 {/* Middle: Analysis */}
-                <div className="col-span-12 lg:col-span-8">
+                <div className="col-span-1 md:col-span-12 lg:col-span-8">
                   <AnalysisBoard 
                     symbol={selectedSymbol} 
                     data={analysisData} 

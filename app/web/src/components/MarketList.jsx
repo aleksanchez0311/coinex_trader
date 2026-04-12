@@ -102,13 +102,13 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
   };
 
   return (
-    <div className="glass p-5 space-y-4">
+    <div className="glass p-3 md:p-5 space-y-3 md:space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold flex items-center gap-2">
+        <h3 className="font-bold flex items-center gap-2 text-sm md:text-base">
           <Clock size={16} className="text-accent" /> Favoritos
         </h3>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-500 font-bold uppercase">Cambio 24h</span>
+          <span className="text-[10px] text-gray-500 font-bold uppercase hidden sm:inline">Cambio 24h</span>
           <button 
             onClick={loadPrices}
             disabled={loading}
@@ -120,12 +120,12 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
         </div>
       </div>
 
-      <div className="space-y-3 overflow-y-auto max-h-[350px] pr-2">
+      <div className="space-y-2 md:space-y-3 overflow-y-auto max-h-[280px] md:max-h-[350px] pr-2">
         {favorites.map((pair) => (
           <div
             key={pair.symbol}
             onClick={() => handleSelect(pair.symbol)}
-            className={`p-3 rounded-lg cursor-pointer transition-all border ${
+            className={`p-2.5 md:p-3 rounded-lg cursor-pointer transition-all border ${
               selected === pair.symbol 
                 ? 'bg-accent/5 border-accent/20' 
                 : 'border-transparent hover:bg-white/5'
@@ -138,7 +138,7 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-lg font-mono">${formatPrice(pair.price)}</span>
+              <span className="text-base md:text-lg font-mono">${formatPrice(pair.price)}</span>
               {pair.up ? <TrendingUp size={14} className="text-long" /> : <TrendingDown size={14} className="text-short" />}
             </div>
           </div>
