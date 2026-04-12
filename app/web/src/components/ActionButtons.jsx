@@ -33,7 +33,8 @@ const PlanOperativoButton = ({ analysisData, onOpenPlanModal, loading }) => {
 };
 
 const InfoAvanzadaButton = ({ analysisData, loading }) => {
-  if (loading || !analysisData) return null;
+  // Solo mostrar cuando el análisis esté completo (tiene analysis con datos)
+  if (loading || !analysisData?.analysis?.bias) return null;
 
   return (
     <motion.div 
