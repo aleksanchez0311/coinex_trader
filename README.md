@@ -11,6 +11,7 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 - **Integración CoinEx**: Órdenes Limit/Market, SL/TP automáticos, modo aislado
 - **Diseño Premium**: UI oscura y responsiva (React + Tailwind + Framer Motion)
 - **Actualización por Foco**: Datos se actualizan automáticamente cuando la app gana foco
+- **Dual Exchange**: OKX para datos de mercado, CoinEx para ejecución de órdenes
 
 ## 📋 Requisitos del Sistema
 
@@ -169,14 +170,19 @@ La estrategia combina:
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
-| `/analyze` | POST | Análisis completo del símbolo |
+| `/` | GET | Estado de la API |
+| `/analyze` | POST | Análisis completo del símbolo (SMC + indicadores) |
 | `/risk-management` | POST | Cálculo de posición y riesgo |
 | `/execute-trade` | POST | Crear orden con SL/TP |
-| `/pnl-stats` | POST | Obtener PnL acumulado |
-| `/tickers` | POST | Precio y cambio en formato batch para múltiples símbolos |
-| `/top-gainers` | GET | Ranking de los activos de mayor crecimiento 24h |
+| `/balance` | POST | Obtener balance de cuenta swap |
+| `/positions` | POST | Obtener posiciones abiertas |
+| `/close-position` | POST | Cerrar una posición |
+| `/pnl-stats` | POST | Obtener PnL acumulado (realizado + no realizado) |
 | `/markets` | GET | Lista de mercados disponibles (futuros) |
-| `/positions` | GET | Posiciones abiertas |
+| `/top-gainers` | GET | Ranking de activos por crecimiento 24h |
+| `/ticker/{symbol}` | GET | Precio actual y cambio 24h de un símbolo |
+| `/tickers` | POST | Precio de múltiples símbolos (batch) |
+| `/market-status` | GET | Estado de conexión y pares activos |
 
 ## 🖥️ Ejecutable Windows (Launcher)
 
