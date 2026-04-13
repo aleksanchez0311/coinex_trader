@@ -55,16 +55,19 @@ echo [5/8] Agregando Plataforma Android...
 if exist "android" rmdir /s /q android
 call npx cap add android
 
-echo [6/8] Configurando Gradle (Modo VPN)...
+echo [6/8] Configurando Gradle...
 call :configure_gradle_final
 
 echo [7/8] Sincronizando...
 call npx cap sync android
 
+echo [7.5/8] Agregando permiso de CAMERA al manifest...
+powershell -Command "$manifest='android\app\src\main\AndroidManifest.xml'; $content=Get-Content $manifest -Raw; if($content -notmatch 'CAMERA'){ $content=$content -replace '<uses-permission android:name=.android.permission.INTERNET. />', '<uses-permission android:name=.android.permission.INTERNET. />`n    <uses-permission android:name=.android.permission.CAMERA. />'; Set-Content $manifest $content }"
+
 echo [8/8] Compilando APK...
 cd android
 :: call gradlew clean
-:: Forzamos descarga limpia a través de la VPN
+:: Forzamos descarga
 call gradlew assembleRelease --no-daemon
 cd ..
 
