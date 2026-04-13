@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, TrendingUp, TrendingDown, RefreshCw, MoreVertical } from 'lucide-react';
+import API_URL from '../config/api';
 
 const PositionsTable = ({ credentials }) => {
   const [positions, setPositions] = useState([]);
@@ -9,7 +10,7 @@ const PositionsTable = ({ credentials }) => {
   const fetchPositions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/positions', {
+      const response = await fetch(`${API_URL}/positions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -33,7 +34,7 @@ const PositionsTable = ({ credentials }) => {
     
     setClosingId(pos.symbol);
     try {
-      const response = await fetch('http://localhost:8000/close-position', {
+      const response = await fetch(`${API_URL}/close-position`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -13,6 +13,7 @@ import StrategyView from './components/StrategyView';
 import RiskManagementView from './components/RiskManagementView';
 import PositionsTable from './components/PositionsTable';
 import SettingsView from './components/SettingsView';
+import API_URL from './config/api';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -58,7 +59,7 @@ const App = () => {
     }
     setPnlLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/pnl-stats', {
+      const response = await fetch(`${API_URL}/pnl-stats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -131,7 +132,7 @@ const App = () => {
     setIsLoading(true);
     setAnalysisStep(`Conectando con OKX • Descargando velas 1h de ${symbol}...`);
     try {
-      const response = await fetch('http://localhost:8000/analyze', {
+      const response = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -175,7 +176,7 @@ const App = () => {
         entry_price: analysisData.analysis.last_price 
       });
       
-      const response = await fetch('http://localhost:8000/risk-management', {
+      const response = await fetch(`${API_URL}/risk-management`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -233,7 +234,7 @@ const App = () => {
     const tokenAmount = positionSize / entryPrice;
     
     try {
-      const response = await fetch('http://localhost:8000/execute-trade', {
+      const response = await fetch(`${API_URL}/execute-trade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

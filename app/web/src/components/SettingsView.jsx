@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Search, Plus, Trash2, TrendingUp } from 'lucide-react';
+import API_URL from '../config/api';
 
 const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
   const [allMarkets, setAllMarkets] = useState([]);
@@ -20,7 +21,7 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
 
   const fetchMarkets = async () => {
     try {
-      const response = await fetch('http://localhost:8000/top-gainers?limit=100&sort_by=volume&verified_only=true');
+      const response = await fetch(`${API_URL}/top-gainers?limit=100&sort_by=volume&verified_only=true`);
       const data = await response.json();
       if (Array.isArray(data)) setAllMarkets(data);
     } catch (error) {
@@ -30,7 +31,7 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
 
   const fetchTopGainers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/top-gainers?limit=30&verified_only=true');
+      const response = await fetch(`${API_URL}/top-gainers?limit=30&verified_only=true`);
       const data = await response.json();
       if (Array.isArray(data)) setTopGainers(data);
     } catch (error) {

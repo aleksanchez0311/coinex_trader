@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Calculator, Play, XCircle, RefreshCw, X } from 'lucide-react';
+import API_URL from '../config/api';
 
 const RiskPanel = ({ symbol, analysis, credentials }) => {
   const [capital, setCapital] = useState(100);
@@ -35,7 +36,7 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const response = await fetch('http://localhost:8000/balance', {
+        const response = await fetch(`${API_URL}/balance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -67,7 +68,7 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
   const calculateRisk = async () => {
     if (!analysis?.analysis) return;
     try {
-      const response = await fetch('http://localhost:8000/risk-management', {
+      const response = await fetch(`${API_URL}/risk-management`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -95,7 +96,7 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
     
     setExecuting(true);
     try {
-      const response = await fetch('http://localhost:8000/execute-trade', {
+      const response = await fetch(`${API_URL}/execute-trade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

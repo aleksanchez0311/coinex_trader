@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Clock, Search, X, Calculator, Play, RefreshCw } from 'lucide-react';
+import API_URL from '../config/api';
 
 const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
   const [favorites, setFavorites] = useState(() => {
@@ -36,7 +37,7 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
     if(symbols.length === 0) return;
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/tickers', {
+      const response = await fetch(`${API_URL}/tickers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbols })
