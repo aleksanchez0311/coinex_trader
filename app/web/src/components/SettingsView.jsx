@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Search, Plus, Trash2, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Search, Plus, Trash2, TrendingUp, ScanLine, X } from 'lucide-react';
 import API_URL from '../config/api';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
   const [allMarkets, setAllMarkets] = useState([]);
   const [topGainers, setTopGainers] = useState([]);
-  const [activeTab, setActiveTab] = useState('all');
+const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const html5QrCodeRef = useRef(null);
+  
+  const isAndroid = /Android/i.test(navigator.userAgent);
   
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('trader_favorites');
@@ -42,7 +47,49 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
   useEffect(() => {
     fetchMarkets();
     fetchTopGainers();
-  }, []);
+}, []);
+
+  const startScanner = async () => {
+    setShowScanner(true);
+    setTimeout(async () => {
+      try {
+        html5QrCodeRef.current = new Html5Qrcode("qr-reader");
+        await html5QrCodeRef.current.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            try {
+              const parsed = JSON.parse(decodedText);
+              if (parsed.apiKey && parsed.apiSecret) {
+                setCredentials({ apiKey: parsed.apiKey, apiSecret: parsed.apiSecret });
+              } else if (parsed.key && parsed.secret) {
+                setCredentials({ apiKey: parsed.key, apiSecret: parsed.secret });
+              } else {
+                setCredentials({ apiKey: decodedText, apiSecret: '' });
+              }
+            } catch {
+              setCredentials({ apiKey: decodedText, apiSecret: '' });
+            }
+            stopScanner();
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error("Error starting scanner:", err);
+        setShowScanner(false);
+      }
+    }, 100);
+  };
+
+  const stopScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current = null;
+      } catch {}
+    }
+    setShowScanner(false);
+  };
 
   const saveFavoritesList = (newList) => {
     setFavorites(newList);
@@ -93,8 +140,25 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
               placeholder="Tu API Secret" 
               className="w-full bg-surface border border-border p-2 md:p-3 rounded-lg outline-none focus:border-accent text-sm" 
             />
+      </div>
+
+      {showScanner && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-2xl p-4 w-full max-w-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg text-white">Escanear QR</h3>
+              <button onClick={stopScanner} className="text-gray-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            <div id="qr-reader" className="w-full rounded-lg overflow-hidden" />
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Apunta la cámara al código QR de CoinEx
+            </p>
           </div>
         </div>
+      )}
+    </div>
         <div className="flex flex-wrap gap-2 md:gap-3">
           <button 
             onClick={() => {
@@ -118,8 +182,16 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
             }}
             className="bg-transparent border border-short text-short font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-short/10 transition-colors ml-auto text-sm"
           >
-            Borrar
+Borrar
           </button>
+          {isAndroid && (
+            <button 
+              onClick={startScanner}
+              className="bg-accent/20 text-accent font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-accent/30 transition-colors text-sm flex items-center gap-2"
+            >
+              <ScanLine size={18} /> Escanear QR
+            </button>
+          )}
         </div>
       </div>
 
