@@ -1,0 +1,21 @@
+[project]
+name = "coinex-trader"
+version = "0.1.0"
+description = "CoinEx Trader API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "ccxt",
+    "pandas",
+    "pydantic",
+    "scipy",
+    "aiodns",
+    "aiohttp",
+    "yarl",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
