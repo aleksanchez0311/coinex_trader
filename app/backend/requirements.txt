@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-dotenv
+ccxt
+pandas
+pydantic
+scipy
+aiodns
+aiohttp
+yarl
