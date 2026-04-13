@@ -61,9 +61,10 @@ const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
     saveFavoritesList(favorites.filter(s => s !== symbol));
   };
 
-  const displayedMarkets = activeTab === 'all' 
+  const displayedMarkets = (activeTab === 'all' 
     ? allMarkets.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
-    : topGainers.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()));
+    : topGainers.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
+  ).sort((a, b) => (b.volume || b.percentage || 0) - (a.volume || a.percentage || 0));
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 md:space-y-6 px-2 md:px-0">

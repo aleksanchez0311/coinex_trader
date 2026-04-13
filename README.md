@@ -1,17 +1,36 @@
 # CoinEx Trader - Intraday Trading Platform
 
-Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart MoneyConcepts (SMC)** + EMA + RSI + ATR.
+Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart Money Concepts (SMC)** + EMA + RSI + ATR con soporte multiplataforma.
 
 ## 🚀 Características
 
-- **Análisis SMC Automatizado**: BOS, CHOCH, FVG, Order Blocks, Zonas de Liquidez
-- **Checklist ORO**: Validación de 6 puntos antes de operar (tendencia EMA, estructura BOS, liquidez, OB/FVG, RSI en zona, volumen)
+### Análisis Técnico
+- **Análisis SMC Automatizado**: Detección de swings, BOS/CHOCH, liquidez, FVG, Order Blocks
+- **Indicadores Técnicos**: EMA 20/50/200, RSI (14), ATR (14) para confirmación de tendencia
+- **Checklist ORO**: Validación de 6 puntos pre-trade (tendencia EMA, estructura BOS, liquidez, OB/FVG, RSI en zona, volumen)
 - **Sistema de Scoring**: Evaluación de setups 0-100 basada en confluencias técnicas
+- **Trading Plan Generator**: Plan completo con sesgo principal, escenarios alternativos, entry/SL/TP, R:R
+
+### Gestión de Riesgo
 - **Motor de Riesgo**: Cálculo automático de posición, margen, SL (basado en ATR) y TP (R:R 1.5+)
-- **Integración CoinEx**: Órdenes Limit/Market, SL/TP automáticos, modo aislado
-- **Diseño Premium**: UI oscura y responsiva (React + Tailwind + Framer Motion)
+- **Position Sizing**: Basado en capital, % riesgo y apalancamiento configurables
+- **Múltiples TP**: TP1 (1.5R), TP2 (2.5R), TP3 (4R) para gestión parcial
+
+### Integraciones
+- **CoinEx Trading**: Ejecución real de órdenes Limit/Market con SL/TP automáticos
+- **OKX Market Data**: Datos de mercado OHLCV, tickers, funding rate
+- **Modo Aislado**: Gestión de riesgo por posición
+
+### UI/UX Premium
+- **Diseño Dark Mode**: Tema oscuro premium con paleta #0B0E11 (Eerie Black)
+- **Glassmorphism**: Modales con efecto blur y transparencia
+- **Responsive**: Adaptable a desktop y móvil
 - **Actualización por Foco**: Datos se actualizan automáticamente cuando la app gana foco
-- **Dual Exchange**: OKX para datos de mercado, CoinEx para ejecución de órdenes
+
+### Multiplataforma
+- **Windows**: Ejecutable nativo (.exe) con launcher C#
+- **Android**: APK nativo con Capacitor
+- **Web**: Aplicación web progresiva (PWA)
 
 ## 📋 Requisitos del Sistema
 
@@ -230,6 +249,68 @@ Hacer click derecho en el icono del tray → "Recargar Proyecto" (hace git pull)
 - **Control de procesos**: Inicia y termina Python y Node.js correctamente
 - **Prevención de duplicados**: Si ya está corriendo, solo abre el navegador
 - **Icono personalizado**: Usa el icono del proyecto
+
+## ð¦ Android APK (Capacitor)
+
+### Compilar APK
+
+```cmd
+cd release
+apkify.bat
+```
+
+### Requisitos previos
+
+1. **Java 22+** (Eclipse Adoptium JDK)
+2. **Android SDK** (API Level 34+)
+3. **Node.js**
+4. **Gradle**
+
+### Configuración
+
+El script `apkify.bat` configura automáticamente:
+- **Capacitor**: Framework para apps nativas
+- **Android Studio**: Build y debugging
+- **Keystore**: Firma digital del APK
+- **Package ID**: `cu.limitlesscode.coinextraderandroid`
+
+### Características Android
+
+- **Nativo**: Performance nativa con WebView
+- **Offline**: Funciona sin conexión (datos cacheados)
+- **Notificaciones**: Alertas de trading push
+- **Responsive**: UI adaptada a móviles
+
+## ðª Componentes UI
+
+### Componentes Principales
+- **App.jsx**: Estado global, modales, control de sidebar
+- **MarketList.jsx**: Lista de mercados favoritos con precios en tiempo real
+- **AnalysisBoard.jsx**: Display de análisis técnico y scoring
+- **PositionsTable.jsx**: Tabla de posiciones abiertas con PnL
+- **RiskPanel.jsx**: Panel avanzado de gestión de riesgo
+- **SettingsView.jsx**: Configuración de API y mercados favoritos
+
+### Componentes Modales
+- **PlanOperativoModal.jsx**: Modal glassmorphism con plan de trading completo
+- **InfoAvanzadaModal.jsx**: Modal con información técnica detallada
+- **ConfirmOrderModal.jsx**: Modal de confirmación de orden con parámetros
+
+### Sistema de Diseño
+
+#### Paleta de Colores (Dark Mode Premium)
+| Elemento | Color |
+|----------|-------|
+| Background (Eerie Black) | `#0B0E11` |
+| Surface (Gunmetal) | `#1E2329` |
+| Long (Emerald Green) | `#00C076` |
+| Short (Candy Apple Red) | `#CF304A` |
+| Neutral/NO TRADE | `#848E9C` |
+| Text Primary | `#EAECEF` |
+
+#### Tipografía
+- **UI/Text**: Inter o Geist Sans
+- **Prices/Data**: Roboto Mono o JetBrains Mono (previene jitter visual)
 
 ## ⚠️ Disclaimer
 

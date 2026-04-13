@@ -69,6 +69,7 @@ call gradlew assembleRelease --no-daemon
 cd ..
 
 :: --- FIRMA ---
+set RELEASE_DIR=%~dp0
 set FINAL_APK_NAME=%PROJECT_NAME%-release.apk
 set RAW_APK=android\app\build\outputs\apk\release\app-release-unsigned.apk
 
@@ -78,10 +79,10 @@ if not exist "%RAW_APK%" (
     pause & exit /b 1
 )
 
-:: Copiar APK a la raíz del proyecto
-echo Copiando APK a la raíz del proyecto...
-copy "%RAW_APK%" "%PROJECT_ROOT%\%PROJECT_NAME%-unsigned.apk"
-echo APK copiado como: %PROJECT_ROOT%\%PROJECT_NAME%-unsigned.apk
+:: Copiar APK a release\
+echo Copiando APK a carpeta release...
+copy "%RAW_APK%" "%RELEASE_DIR%%PROJECT_NAME%-unsigned.apk"
+echo APK copiado como: %RELEASE_DIR%%PROJECT_NAME%-unsigned.apk
 
 :: Usar rutas absolutas del Android SDK
 set BUILD_TOOLS_PATH=%ANDROID_SDK_PATH%\build-tools\35.0.0
@@ -92,22 +93,32 @@ echo Firmando APK con herramientas del SDK...
 echo ZIPALIGN: %ZIPALIGN%
 echo APSIGNER: %APSIGNER%
 
-%ZIPALIGN% -f -v 4 "%RAW_APK%" "%PROJECT_NAME%-aligned.apk"
+cd "%RELEASE_DIR%"
+%ZIPALIGN% -f -v 4 "%RELEASE_DIR%%PROJECT_NAME%-unsigned.apk" "%PROJECT_NAME%-aligned.apk"
 set KEYSTORE_NAME=%PROJECT_NAME%-release.keystore
 if not exist "%KEYSTORE_NAME%" (
     keytool -genkey -v -keystore "%KEYSTORE_NAME%" -alias releaseKey -keyalg RSA -keysize 2048 -validity 10000 -storepass uyK16cvG45. -keypass uyK16cvG45. -dname "CN=%PROJECT_NAME%, O=Trading, C=US"
 )
-%APSIGNER% sign --ks "%KEYSTORE_NAME%" --ks-pass pass:uyK16cvG45. --out "%FINAL_APK_NAME%" "%PROJECT_NAME%-aligned.apk"
+%APSIGNER% sign --ks "%KEYSTORE_NAME%" --ks-pass pass:uyK16cvG45. --out "%PROJECT_NAME%-release.apk" "%PROJECT_NAME%-aligned.apk"
 if exist "%PROJECT_NAME%-aligned.apk" del "%PROJECT_NAME%-aligned.apk"
+if exist "%PROJECT_NAME%-unsigned.apk" del "%PROJECT_NAME%-unsigned.apk"
 
 :: Copiar APK firmado a la raíz
-echo Copiando APK firmado a la raíz del proyecto...
-copy "%FINAL_APK_NAME%" "%PROJECT_ROOT%\%FINAL_APK_NAME%"
+copy "%PROJECT_NAME%-release.apk" "%PROJECT_ROOT%\%PROJECT_NAME%-release.apk"
 
 echo.
 echo ========================================
 echo PROCESO FINALIZADO CON EXITO
+echo APK: %RELEASE_DIR%%PROJECT_NAME%-release.apk
+echo APK: %PROJECT_ROOT%\%PROJECT_NAME%-release.apk
 echo ========================================
+echo.
+echo ========================================
+echo      INSTALAR VIA ADB
+echo ========================================
+echo Para instalar, ejecuta:
+echo   adb install -r "%PROJECT_ROOT%\%PROJECT_NAME%-release.apk"
+echo.
 pause
 exit /b 0
 
@@ -118,8 +129,9 @@ echo ========================================
 echo.
 
 :: Configurar rutas
+set RELEASE_DIR=%~dp0
 set FINAL_APK_NAME=%PROJECT_NAME%-release.apk
-set RAW_APK=%PROJECT_ROOT%\%PROJECT_NAME%-unsigned.apk
+set RAW_APK=%RELEASE_DIR%%PROJECT_NAME%-unsigned.apk
 
 if not exist "%RAW_APK%" (
     echo.
@@ -137,24 +149,31 @@ echo Firmando APK existente: %RAW_APK%
 echo ZIPALIGN: %ZIPALIGN%
 echo APSIGNER: %APSIGNER%
 
+cd "%RELEASE_DIR%"
 %ZIPALIGN% -f -v 4 "%RAW_APK%" "%PROJECT_NAME%-aligned.apk"
 set KEYSTORE_NAME=%PROJECT_NAME%-release.keystore
 if not exist "%KEYSTORE_NAME%" (
     keytool -genkey -v -keystore "%KEYSTORE_NAME%" -alias releaseKey -keyalg RSA -keysize 2048 -validity 10000 -storepass uyK16cvG45. -keypass uyK16cvG45. -dname "CN=%PROJECT_NAME%, O=Trading, C=US"
 )
-%APSIGNER% sign --ks "%KEYSTORE_NAME%" --ks-pass pass:uyK16cvG45. --out "%FINAL_APK_NAME%" "%PROJECT_NAME%-aligned.apk"
+%APSIGNER% sign --ks "%KEYSTORE_NAME%" --ks-pass pass:uyK16cvG45. --out "%PROJECT_NAME%-release.apk" "%PROJECT_NAME%-aligned.apk"
 if exist "%PROJECT_NAME%-aligned.apk" del "%PROJECT_NAME%-aligned.apk"
 
 :: Copiar APK firmado a la raíz
-echo Copiando APK firmado a la raíz del proyecto...
-copy "%FINAL_APK_NAME%" "%PROJECT_ROOT%\%FINAL_APK_NAME%"
+copy "%PROJECT_NAME%-release.apk" "%PROJECT_ROOT%\%PROJECT_NAME%-release.apk"
 
 echo.
 echo ========================================
 echo APK FIRMADO CON EXITO
 echo ========================================
-echo APK firmado: %PROJECT_ROOT%\%FINAL_APK_NAME%
-echo Archivos auxiliares permanecen en: %cd%
+echo APK firmado: %RELEASE_DIR%%PROJECT_NAME%-release.apk
+echo APK firmado: %PROJECT_ROOT%\%PROJECT_NAME%-release.apk
+echo Archivos auxiliares permanecen en: %RELEASE_DIR%
+echo.
+echo ========================================
+echo      INSTALAR VIA ADB
+echo ========================================
+echo Para instalar, ejecuta:
+echo   adb install -r "%PROJECT_ROOT%\%PROJECT_NAME%-release.apk"
 echo.
 pause
 exit /b 0
