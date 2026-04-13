@@ -82,5 +82,7 @@ app/web/capacitor.config.*
 
 # Ejecutables generados
 CoinEx*.exe
-release/*.exe
-release/*.bat
+# Excluir todo en release excepto .bat y .cs
+release/*
+!release/*.bat
+!release/*.cs

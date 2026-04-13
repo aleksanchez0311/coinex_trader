@@ -38,7 +38,7 @@ cd /d "%WEB_DIR%"
 
 echo [1/8] Instalando Capacitor 7...
 call npm install @capacitor/cli@7.0.0 @capacitor/core@7.0.0 @capacitor/android@7.0.0
-call npm audit fix --force
+call npm audit fix
 
 echo [2/8] Configurando SDK...
 call npx cap config set android.sdkPath "%ANDROID_SDK_PATH%"
@@ -65,7 +65,7 @@ echo [8/8] Compilando APK...
 cd android
 :: call gradlew clean
 :: Forzamos descarga limpia a través de la VPN
-call gradlew assembleRelease --no-daemon --info
+call gradlew assembleRelease --no-daemon
 cd ..
 
 :: --- FIRMA ---
