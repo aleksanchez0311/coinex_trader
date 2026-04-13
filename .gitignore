@@ -69,3 +69,18 @@ htmlcov/
 
 # Kilo
 .kilo/
+
+# Android/Capacitor
+app/web/android/
+app/web/capacitor.config.*
+
+# APKs y Keystores
+*.apk
+*.apk.idsig
+*.keystore
+*.jks
+
+# Ejecutables generados
+CoinEx*.exe
+release/*.exe
+release/*.bat
