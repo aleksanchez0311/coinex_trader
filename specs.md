@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-Plataforma fullstack para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en Smart Money Concepts (SMC).
+Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en Smart Money Concepts (SMC) con soporte multiplataforma (Windows, Android, Web).
 
 ## 🏗️ Arquitectura
 
@@ -228,3 +228,109 @@ Todas las actualizaciones de datos se ejecutan cuando la app gana foco (visibili
 - **ALTA PROBABILIDAD**: score ≥ 70 AND checks ≥ 5
 - **MEDIA PROBABILIDAD**: score ≥ 50 AND checks ≥ 4
 - **BAJA PROBABILIDAD**: score < 50
+
+## ð¦ Android APK (Capacitor)
+
+### Arquitectura Android
+```
+WebView (React App)
+â Capacitor Bridge
+â Native Android APIs
+â System Services
+```
+
+### Componentes Android
+- **Capacitor Core**: Bridge entre JavaScript y nativo
+- **Android WebView**: Renderizado de la app React
+- **Notifications API**: Alertas push de trading
+- **Storage API**: Persistencia local de datos
+- **App API**: Control de ciclo de vida
+
+### Configuración
+- **Package ID**: `cu.limitlesscode.coinextraderandroid`
+- **Target SDK**: API Level 34+
+- **Min SDK**: API Level 24+
+- **Java Version**: 22+ (Eclipse Adoptium)
+
+### Build Process
+1. `npm run build` - Build frontend
+2. `npx cap sync` - Sincronizar con Android
+3. `gradlew assembleRelease` - Compilar APK
+4. `apkify.bat` - Script automatizado
+
+## ðª Componentes UI Detallados
+
+### Componentes Principales
+- **App.jsx**: Estado global, manejo de modales, control sidebar
+- **MarketList.jsx**: Lista favoritos, precios tiempo real, gestión de mercados
+- **AnalysisBoard.jsx**: Display análisis técnico, scoring, checklist
+- **PositionsTable.jsx**: Posiciones abiertas, PnL, acciones rápidas
+- **RiskPanel.jsx**: Panel avanzado gestión riesgo, cálculos en tiempo real
+- **SettingsView.jsx**: Config API, mercados favoritos, preferencias
+- **Header.jsx**: Logo, menu toggle, PnL display, estado conexión
+- **Sidebar.jsx**: Navegación colapsable (oculta por defecto)
+- **ActionButtons.jsx**: Botones Plan Operativo e Info Avanzada
+- **StrategyView.jsx**: Display estrategia y parámetros técnicos
+
+### Componentes Modales
+- **PlanOperativoModal.jsx**: Modal glassmorphism con plan trading completo
+  - Sesgo principal (LONG/SHORT/NO TRADE)
+  - Escenarios alternativos
+  - Entry/SL/TP con R:R calculado
+  - Checklist pre-trade validado
+- **InfoAvanzadaModal.jsx**: Modal con información técnica detallada
+  - Análisis SMC completo
+  - Indicadores técnicos
+  - Niveles clave
+  - Volumen y liquidez
+- **ConfirmOrderModal.jsx**: Modal confirmación orden
+  - Parámetros orden completa
+  - Cálculo margen y riesgo
+  - Modo orden (Limit/Market)
+  - Confirmación ejecución
+
+### Sistema de Estilos
+- **Tailwind CSS**: Framework de estilos
+- **Framer Motion**: Animaciones y transiciones
+- **Lucide React**: Iconos modernos
+- **Glassmorphism**: Efectos blur y transparencia
+- **Dark Theme**: Paleta #0B0E11 (Eerie Black) premium
+
+## ð¡ Estado y Gestión de Datos
+
+### Estado Global (App.jsx)
+- **selectedSymbol**: Símbolo seleccionado actualmente
+- **analysis**: Datos de análisis técnico
+- **positions**: Posiciones abiertas
+- **riskConfig**: Configuración de riesgo
+- **showSidebar**: Control de sidebar
+- **modals**: Estado de modales abiertos
+
+### LocalStorage
+- **trader_creds**: Credenciales API encriptadas
+- **favorites**: Mercados favoritos
+- **riskSettings**: Configuración persistente de riesgo
+- **uiPreferences**: Preferencias de interfaz
+
+### Actualización Automática
+- **visibilitychange**: Evento browser focus
+- **Interval updates**: Actualizaciones periódicas
+- **WebSocket**: Conexión tiempo real (futuro)
+
+## ð¡ Actualizaciones y Limitaciones
+
+### Limitaciones Actuales
+- **Modo Paper**: No implementado (todo es LIVE)
+- **Mercados**: Solo futuros perpetuos CoinEx
+- **Órdenes**: Sin soporte OCO, sin trailing stop
+- **Multiplataforma**: Launcher solo Windows, APK solo Android
+- **CORS**: Permitido para cualquier origen (desarrollo)
+- **Offline**: Funcionalidad limitada sin conexión
+
+### Mejoras Planeadas
+- **Paper Trading**: Modo simulación
+- **Más Exchanges**: Binance, Bybit integración
+- **Órdenes Avanzadas**: OCO, trailing stop, conditional
+- **iOS App**: Capacitor iOS
+- **Desktop App**: Electron cross-platform
+- **WebSocket**: Streaming tiempo real

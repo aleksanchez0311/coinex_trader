@@ -2,7 +2,7 @@
 
 ## Project Context
 
-Cryptocurrency intraday trading platform for futures with SMC + EMA + RSI + ATR analysis, risk management, and real CoinEx trading. Features a premium dark mode UI with "Data-Heavy Minimalism" design philosophy.
+Cryptocurrency intraday trading platform for futures with Smart Money Concepts (SMC) + EMA + RSI + ATR analysis, risk management, and real CoinEx trading. Features a premium dark mode UI with "Data-Heavy Minimalism" design philosophy and multiplatform support (Windows, Android, Web).
 
 ## Directory Structure
 
@@ -95,9 +95,11 @@ trader/
 - `app/web/tailwind.config.js` - Color palette: #0B0E11 background, #00C076 long, #CF304A short
 
 ### Launcher
-- `release/exeify.bat` - Build executable script
+- `release/exeify.bat` - Build executable script (Windows)
 - `release/iconify.bat` - Icon generator
 - `release/exeify.cs` - C# launcher code
+- `release/apkify.bat` - Build APK script (Android)
+- `release/requirements.txt` - Python dependencies for launcher
 
 ## Design System
 
@@ -131,6 +133,9 @@ cd app/web && npm run dev
 
 # Build executable (Windows)
 cd release && exeify.bat
+
+# Build APK (Android)
+cd release && apkify.bat
 ```
 
 ## Configuration
