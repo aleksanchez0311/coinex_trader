@@ -7,7 +7,7 @@ echo.
 
 :: Configuración de rutas
 set PROJECT_ROOT=%~dp0..
-set WEB_DIR=%PROJECT_ROOT%\app\web
+set FRONTEND_DIR=%PROJECT_ROOT%\app\frontend
 set ANDROID_SDK_PATH=%ANDROID_HOME%
 if "%ANDROID_SDK_PATH%"=="" set ANDROID_SDK_PATH=%ANDROID_SDK_ROOT%
 if "%ANDROID_SDK_PATH%"=="" set ANDROID_SDK_PATH=C:\Users\aleks\Documents\WorkSpaces\sdk\android-sdk
@@ -34,7 +34,7 @@ set /p PROJECT_NAME="Nombre de la app: "
 set /p PACKAGE_ID="ID del paquete: "
 
 :start_process
-cd /d "%WEB_DIR%"
+cd /d "%FRONTEND_DIR%"
 
 echo [1/8] Instalando Capacitor 7...
 call npm install @capacitor/cli@7.0.0 @capacitor/core@7.0.0 @capacitor/android@7.0.0
@@ -48,7 +48,7 @@ if exist "capacitor.config.*" del /q capacitor.config.*
 call npx cap init "%PROJECT_NAME%" "%PACKAGE_ID%" --web-dir dist
 call :configure_capacitor_config
 
-echo [4/8] Compilando Web...
+echo [4/8] Compilando Frontend...
 call npm run build
 
 echo [5/8] Agregando Plataforma Android...

@@ -1,0 +1,6 @@
+{
+  "appId": "cu.limitlesscode.coinextraderandroid",
+  "appName": "CoinEx Trader",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}
