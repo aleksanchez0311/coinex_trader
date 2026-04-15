@@ -20,7 +20,7 @@ trader/
 │   │   │   └── trading.py      # Pydantic models
 │   │   └── utils/
 │   │       └── exchange_clients.py  # Exchange clients (OKX market data, CoinEx trading)
-│   └── web/                      # React + Vite
+│   └── frontend/                 # React + Vite
 │       ├── src/
 │       │   ├── main.jsx          # Entry point
 │       │   ├── index.css         # Tailwind styles + theme
@@ -72,27 +72,27 @@ trader/
 ### Frontend
 
 #### Main Components
-- `app/web/src/App.jsx` - Main app with state management, modals, sidebar control
-- `app/web/src/components/MarketList.jsx` - Favorites list display
-- `app/web/src/components/AnalysisBoard.jsx` - Analysis display (score, bias, checklist, trading plan)
-- `app/web/src/components/ActionButtons.jsx` - Plan Operativo & Info Avanzada buttons
-- `app/web/src/components/Sidebar.jsx` - Collapsible navigation (hidden by default)
-- `app/web/src/components/Header.jsx` - Top header with logo, menu button, PnL
-- `app/web/src/components/SettingsView.jsx` - API Config and Favorite Markets Manager
-- `app/web/src/components/StrategyView.jsx` - Strategy display
-- `app/web/src/components/RiskManagementView.jsx` - Risk management view
-- `app/web/src/components/RiskPanel.jsx` - Risk panel component
-- `app/web/src/components/PositionsTable.jsx` - Open positions
+- `app/frontend/src/App.jsx` - Main app with state management, modals, sidebar control
+- `app/frontend/src/components/MarketList.jsx` - Favorites list display
+- `app/frontend/src/components/AnalysisBoard.jsx` - Analysis display (score, bias, checklist, trading plan)
+- `app/frontend/src/components/ActionButtons.jsx` - Plan Operativo & Info Avanzada buttons
+- `app/frontend/src/components/Sidebar.jsx` - Collapsible navigation (hidden by default)
+- `app/frontend/src/components/Header.jsx` - Top header with logo, menu button, PnL
+- `app/frontend/src/components/SettingsView.jsx` - API Config and Favorite Markets Manager
+- `app/frontend/src/components/StrategyView.jsx` - Strategy display
+- `app/frontend/src/components/RiskManagementView.jsx` - Risk management view
+- `app/frontend/src/components/RiskPanel.jsx` - Risk panel component
+- `app/frontend/src/components/PositionsTable.jsx` - Open positions
 
 #### Modal Components
-- `app/web/src/components/modals/PlanOperativoModal.jsx` - Trading plan modal (glassmorphism)
-- `app/web/src/components/modals/InfoAvanzadaModal.jsx` - Advanced info modal
-- `app/web/src/components/modals/ConfirmOrderModal.jsx` - Order confirmation modal
+- `app/frontend/src/components/modals/PlanOperativoModal.jsx` - Trading plan modal (glassmorphism)
+- `app/frontend/src/components/modals/InfoAvanzadaModal.jsx` - Advanced info modal
+- `app/frontend/src/components/modals/ConfirmOrderModal.jsx` - Order confirmation modal
 
 #### Styling
-- `app/web/src/index.css` - Premium dark theme (Data-Heavy Minimalism)
-- `app/web/src/App.css` - Global styles
-- `app/web/tailwind.config.js` - Color palette: #0B0E11 background, #00C076 long, #CF304A short
+- `app/frontend/src/index.css` - Premium dark theme (Data-Heavy Minimalism)
+- `app/frontend/src/App.css` - Global styles
+- `app/frontend/tailwind.config.js` - Color palette: #0B0E11 background, #00C076 long, #CF304A short
 
 ### Launcher
 - `release/exeify.bat` - Build executable script (Windows)
@@ -129,7 +129,7 @@ trader/
 cd app/backend && python main.py
 
 # Frontend
-cd app/web && npm run dev
+cd app/frontend && npm run dev
 
 # Build executable (Windows)
 cd release && exeify.bat
@@ -161,7 +161,7 @@ The app generates complete trading plans including:
 cd app/backend && pytest
 
 # Frontend lint
-cd app/web && npm run lint
+cd app/frontend && npm run lint
 ```
 
 ## Known Issues

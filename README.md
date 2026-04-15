@@ -54,7 +54,7 @@ trader/
 │   │   │   └── trading.py        # Modelos Pydantic
 │   │   └── utils/
 │   │       └── exchange_clients.py # Clientes CoinEx/OKX (CCXT)
-│   └── web/                      # React + Vite
+│   └── frontend/                 # React + Vite
 │       ├── src/
 │       │   ├── main.jsx          # Entry point React
 │       │   ├── index.css         # Estilos Tailwind
@@ -118,7 +118,7 @@ Dependencias:
 ### Frontend
 
 ```bash
-cd app/web
+cd app/frontend
 npm install
 npm run dev
 ```

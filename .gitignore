@@ -71,8 +71,8 @@ htmlcov/
 .kilo/
 
 # Android/Capacitor
-app/web/android/
-app/web/capacitor.config.*
+app/frontend/android/
+app/frontend/capacitor.config.*
 
 # APKs y Keystores
 *.apk

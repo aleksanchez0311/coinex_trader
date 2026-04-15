@@ -153,15 +153,15 @@ namespace TraderLauncher
         private void InstallDependencies()
         {
             string backendDir = Path.Combine(appDataDir, "app", "backend");
-            string webDir = Path.Combine(appDataDir, "app", "web");
+            string frontendDir = Path.Combine(appDataDir, "app", "frontend");
 
             if (!Directory.Exists(backendDir))
             {
                 Directory.CreateDirectory(backendDir);
             }
-            if (!Directory.Exists(webDir))
+            if (!Directory.Exists(frontendDir))
             {
-                Directory.CreateDirectory(webDir);
+                Directory.CreateDirectory(frontendDir);
             }
 
             if (File.Exists(Path.Combine(backendDir, "requirements.txt")) && !Directory.Exists(Path.Combine(backendDir, ".venv")))
@@ -189,12 +189,12 @@ namespace TraderLauncher
                 }
             }
 
-            if (File.Exists(Path.Combine(webDir, "package.json")) && !Directory.Exists(Path.Combine(webDir, "node_modules")))
+            if (File.Exists(Path.Combine(frontendDir, "package.json")) && !Directory.Exists(Path.Combine(frontendDir, "node_modules")))
             {
                 UpdateStatus("Instalando dependencias Node.js...");
                 ProcessStartInfo psiNpm = new ProcessStartInfo();
                 psiNpm.FileName = "cmd.exe";
-                psiNpm.Arguments = "/c \"cd /d " + webDir + " && npm install\"";
+                psiNpm.Arguments = "/c \"cd /d " + frontendDir + " && npm install\"";
                 psiNpm.CreateNoWindow = true;
                 psiNpm.UseShellExecute = false;
                 using (Process proc = Process.Start(psiNpm))
@@ -205,7 +205,7 @@ namespace TraderLauncher
                 UpdateStatus("Compilando frontend...");
                 ProcessStartInfo psiBuild = new ProcessStartInfo();
                 psiBuild.FileName = "cmd.exe";
-                psiBuild.Arguments = "/c \"cd /d " + webDir + " && npm run build\"";
+                psiBuild.Arguments = "/c \"cd /d " + frontendDir + " && npm run build\"";
                 psiBuild.CreateNoWindow = true;
                 psiBuild.UseShellExecute = false;
                 using (Process proc = Process.Start(psiBuild))
@@ -218,7 +218,7 @@ namespace TraderLauncher
         private void StartServers()
         {
             string backendDir = Path.Combine(appDataDir, "app", "backend");
-            string webDir = Path.Combine(appDataDir, "app", "web");
+            string frontendDir = Path.Combine(appDataDir, "app", "frontend");
 
             ProcessStartInfo psiBackend = new ProcessStartInfo();
             psiBackend.FileName = "cmd.exe";
@@ -229,7 +229,7 @@ namespace TraderLauncher
 
             ProcessStartInfo psiFrontend = new ProcessStartInfo();
             psiFrontend.FileName = "cmd.exe";
-            psiFrontend.Arguments = "/c \"cd /d \"" + webDir + "\" && npm run preview\"";
+            psiFrontend.Arguments = "/c \"cd /d \"" + frontendDir + "\" && npm run preview\"";
             psiFrontend.CreateNoWindow = true;
             psiFrontend.UseShellExecute = false;
             frontendProcess = Process.Start(psiFrontend);
@@ -292,7 +292,7 @@ namespace TraderLauncher
                     {
                         string cmdLine = "";
                         try { cmdLine = proc.MainModule.FileName; } catch { }
-                        if (cmdLine.Contains("app\\backend") || cmdLine.Contains("app\\web"))
+                        if (cmdLine.Contains("app\\backend") || cmdLine.Contains("app\\frontend"))
                         {
                             proc.Kill();
                         }

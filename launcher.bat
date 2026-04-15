@@ -15,7 +15,7 @@ python.exe -m pip install --upgrade pip
 pip install -r requirements.txt
 
 echo [2/6] Instalando dependencias Node.js...
-cd /d "%STARTDIR%\app\web"
+cd /d "%STARTDIR%\app\frontend"
 if not exist node_modules (
     echo Instalando dependencias Node.js...
     call npm install
@@ -27,7 +27,7 @@ echo [4/6] Compilando ejecutable...
 call exeify.bat
 
 echo [5/6] Construyendo la interfaz web...
-cd /d "%STARTDIR%\app\web"
+cd /d "%STARTDIR%\app\frontend"
 call npm install
 call npm run build
 
@@ -35,7 +35,7 @@ cd /d "%STARTDIR%"
 
 echo [6/6] Iniciando servidores...
 start "Backend" cmd /k "cd /d "%STARTDIR%\app\backend" && call .venv\Scripts\activate.bat && python main.py"
-start "Frontend" cmd /k "cd /d "%STARTDIR%\app\web" && npm run dev"
+start "Frontend" cmd /k "cd /d "%STARTDIR%\app\frontend" && npm run dev"
 
 echo.
 echo ===================================================
