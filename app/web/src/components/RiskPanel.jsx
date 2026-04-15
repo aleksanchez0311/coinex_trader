@@ -15,6 +15,16 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
   const [marginMode, setMarginMode] = useState('isolated');
   const [orderType, setOrderType] = useState('limit');
 
+  const getResolvedPositionSize = () => {
+    const directSize = result?.position?.position_size;
+    if (directSize && Number(directSize) > 0) return Number(directSize);
+
+    const nestedSize = result?.position?.posicion?.cantidad;
+    if (nestedSize && Number(nestedSize) > 0) return Number(nestedSize);
+
+    return null;
+  };
+
   useEffect(() => {
     if (analysis?.risk_recommendations) {
       const recs = analysis.risk_recommendations;
@@ -80,6 +90,11 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
           leverage
         })
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.detail || 'Error en el cálculo'}`);
+        return;
+      }
       const data = await response.json();
       setResult(data);
       if (data.plan?.tp1) {
@@ -93,6 +108,11 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
   const executeTrade = async () => {
 
     if (!result || !analysis) return;
+    const positionSize = getResolvedPositionSize();
+    if (!positionSize) {
+      alert('Error: no hay tamaño de posición válido. Actualiza cálculos de riesgo.');
+      return;
+    }
     
     setExecuting(true);
     try {
@@ -102,7 +122,7 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
         body: JSON.stringify({
           symbol,
           side: analysis.analysis.bias === "Alcista" ? 'buy' : 'sell',
-          amount: result.position.position_size,
+          amount: positionSize,
           entry_price: orderType === 'limit' ? analysis.analysis.last_price : null,
           stop_loss: slPrice,
           take_profit: tpPrice || result.plan?.tp1 || null,
@@ -359,7 +379,7 @@ const RiskPanel = ({ symbol, analysis, credentials }) => {
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-gray-400">Cantidad:</span>
-                <span className="font-mono text-white">{result?.position?.position_size} {symbol.split('/')[0]}</span>
+                <span className="font-mono text-white">{getResolvedPositionSize()} {symbol.split('/')[0]}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-gray-400">Ejecución:</span>

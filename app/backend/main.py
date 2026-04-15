@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from typing import Dict
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import time
@@ -9,7 +9,14 @@ from engines.analysis import AnalysisEngine
 from engines.scoring import ScoringEngine
 from engines.risk import RiskEngine
 from utils.exchange_clients import TradingClient, MarketDataClient
-from models.trading import AnalysisRequest, RiskRequest, TradeExecutionRequest
+from models.trading import (
+    AnalysisRequest,
+    RiskRequest,
+    TradeExecutionRequest,
+    CredentialsRequest,
+    ClosePositionRequest,
+    TickersBatchRequest,
+)
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -28,14 +35,16 @@ market_client = MarketDataClient()
 async def validation_exception_handler(req, exc):
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors(), "body": exc.body},
+        content={"detail": exc.errors()},
     )
 
 
 # Configuración de CORS para el frontend
+cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,7 +58,10 @@ async def root():
 
 @app.post("/analyze")
 async def analyze_pair(req: AnalysisRequest):
-    cache_key = f"{req.symbol}:{req.timeframe}:{req.api_key[:8] if req.api_key else ''}"
+    symbol = req.symbol or "BTC/USDT"
+    country = req.country or "Cuba"
+    capital = req.capital if req.capital and req.capital > 0 else 10.0
+    cache_key = f"{symbol}:{req.timeframe}:{req.api_key[:8] if req.api_key else ''}"
     current_time = time.time()
 
     if cache_key in ohlcv_cache:
@@ -57,19 +69,21 @@ async def analyze_pair(req: AnalysisRequest):
         if current_time - cached_time < CACHE_TTL:
             ohlcv = cached_ohlcv
         else:
-            ohlcv = market_client.get_ohlcv(req.symbol, req.timeframe)
+            ohlcv = market_client.get_ohlcv(symbol, req.timeframe)
             if not isinstance(ohlcv, dict) or "error" not in ohlcv:
                 ohlcv_cache[cache_key] = (current_time, ohlcv)
     else:
-        ohlcv = market_client.get_ohlcv(req.symbol, req.timeframe)
+        ohlcv = market_client.get_ohlcv(symbol, req.timeframe)
         if not isinstance(ohlcv, dict) or "error" not in ohlcv:
             ohlcv_cache[cache_key] = (current_time, ohlcv)
 
     if isinstance(ohlcv, dict) and "error" in ohlcv:
         raise HTTPException(status_code=400, detail=ohlcv["error"])
 
-    derivatives = market_client.get_derivatives_data(req.symbol)
-    derivatives_cache_key = f"derivatives:{req.symbol}"
+    derivatives = market_client.get_derivatives_data(symbol)
+    ticker = market_client.get_ticker(symbol)
+    market_context = market_client.get_market_context(symbol)
+    derivatives_cache_key = f"derivatives:{symbol}"
     derivatives_cache[derivatives_cache_key] = (current_time, derivatives)
 
     df = pd.DataFrame(
@@ -77,7 +91,14 @@ async def analyze_pair(req: AnalysisRequest):
     )
 
     engine = AnalysisEngine(df)
-    analysis = engine.analyze_all()
+    analysis = engine.analyze_all(
+        symbol=symbol,
+        country=country,
+        capital=capital,
+        ticker=ticker,
+        derivatives=derivatives,
+        market_context=market_context,
+    )
 
     scoring = ScoringEngine()
     score_result = scoring.calculate_score(analysis)
@@ -86,7 +107,7 @@ async def analyze_pair(req: AnalysisRequest):
     risk_recommendations = risk_engine.get_recommendations(analysis, score_result)
 
     return {
-        "symbol": req.symbol,
+        "symbol": symbol,
         "analysis": analysis,
         "scoring": score_result,
         "risk_recommendations": risk_recommendations,
@@ -97,13 +118,46 @@ async def analyze_pair(req: AnalysisRequest):
 @app.post("/risk-management")
 async def calculate_risk(req: RiskRequest):
     risk_engine = RiskEngine()
-    pos_data = risk_engine.calculate_position(
-        req.capital, req.risk_pct, req.entry_price, req.stop_loss, req.leverage
-    )
+    fixed_risk_pct = 30.0
+    fixed_leverage = 20
+    fixed_operation_size_pct = 70.0
+
+    use_70_pct = True
+
+    if req.entry_price <= 0:
+        raise HTTPException(status_code=422, detail="entry_price debe ser mayor a 0")
+    if req.leverage <= 0:
+        raise HTTPException(status_code=422, detail="leverage debe ser mayor a 0")
+    if req.entry_price == req.stop_loss:
+        raise HTTPException(
+            status_code=422, detail="entry_price y stop_loss no pueden ser iguales"
+        )
+
+    if use_70_pct:
+        pos_data = risk_engine.calculate_position_with_70_pct(
+            capital=req.capital,
+            risk_pct=fixed_risk_pct,
+            entry_price=req.entry_price,
+            stop_loss=req.stop_loss,
+            leverage=fixed_leverage,
+            operation_size_pct=fixed_operation_size_pct,
+        )
+    else:
+        pos_data = risk_engine.calculate_position(
+            req.capital, req.risk_pct, req.entry_price, req.stop_loss, req.leverage
+        )
+    if isinstance(pos_data, dict) and "error" in pos_data:
+        raise HTTPException(status_code=422, detail=pos_data["error"])
 
     bias = "Alcista" if req.entry_price > req.stop_loss else "Bajista"
 
     if req.take_profit:
+        price_distance = abs(req.entry_price - req.stop_loss)
+        if price_distance == 0:
+            raise HTTPException(
+                status_code=422,
+                detail="No se puede calcular R:R con entry_price igual a stop_loss",
+            )
         plan = {
             "entry": req.entry_price,
             "stop_loss": req.stop_loss,
@@ -111,15 +165,22 @@ async def calculate_risk(req: RiskRequest):
             "tp2": None,
             "tp3": None,
             "rr_ratio": round(
-                abs(req.take_profit - req.entry_price)
-                / abs(req.entry_price - req.stop_loss),
+                abs(req.take_profit - req.entry_price) / price_distance,
                 2,
             ),
         }
     else:
         plan = risk_engine.get_trade_plan(req.entry_price, req.stop_loss, bias)
 
-    return {"position": pos_data, "plan": plan}
+    return {
+        "position": pos_data,
+        "plan": plan,
+        "fixed_params": {
+            "leverage": fixed_leverage,
+            "risk_pct": fixed_risk_pct,
+            "operation_size_pct": fixed_operation_size_pct,
+        },
+    }
 
 
 @app.post("/execute-trade")
@@ -133,7 +194,7 @@ async def execute_trade(req: TradeExecutionRequest):
         entry_price=req.entry_price,
         stop_loss=req.stop_loss,
         take_profit=req.take_profit,
-        leverage=req.leverage,
+        leverage=20,
         margin_mode=req.margin_mode,
         order_type=req.order_type,
     )
@@ -145,12 +206,9 @@ async def execute_trade(req: TradeExecutionRequest):
 
 
 @app.post("/balance")
-async def get_balance(req: Dict = Body(...)):
+async def get_balance(req: CredentialsRequest):
     """Obtiene el balance de la cuenta (Swap por defecto)"""
-    api_key = req.get("api_key")
-    secret = req.get("secret")
-
-    client = TradingClient(api_key=api_key, secret=secret)
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
     balance = client.get_balance()
 
     if "error" in balance:
@@ -160,12 +218,9 @@ async def get_balance(req: Dict = Body(...)):
 
 
 @app.post("/positions")
-async def get_positions(req: Dict = Body(...)):
+async def get_positions(req: CredentialsRequest):
     """Obtiene las posiciones abiertas"""
-    api_key = req.get("api_key")
-    secret = req.get("secret")
-
-    client = TradingClient(api_key=api_key, secret=secret)
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
     positions = client.get_positions()
 
     if isinstance(positions, dict) and "error" in positions:
@@ -175,16 +230,10 @@ async def get_positions(req: Dict = Body(...)):
 
 
 @app.post("/close-position")
-async def close_position(req: Dict = Body(...)):
+async def close_position(req: ClosePositionRequest):
     """Cierra una posición abierta"""
-    api_key = req.get("api_key")
-    secret = req.get("secret")
-    symbol = req.get("symbol")
-    side = req.get("side")
-    amount = req.get("amount")
-
-    client = TradingClient(api_key=api_key, secret=secret)
-    result = client.close_position(symbol, side, amount)
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    result = client.close_position(req.symbol, req.side, req.amount)
 
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -193,15 +242,9 @@ async def close_position(req: Dict = Body(...)):
 
 
 @app.post("/pnl-stats")
-async def get_pnl_stats(req: Dict = Body(...)):
+async def get_pnl_stats(req: CredentialsRequest):
     """Obtiene estadísticas de PnL realizado"""
-    api_key = req.get("api_key")
-    secret = req.get("secret")
-
-    if not api_key or not secret:
-        return {"total_pnl": 0, "count": 0, "message": "Sin credenciales configuradas"}
-
-    client = TradingClient(api_key=api_key, secret=secret)
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
     stats = client.get_realized_pnl()
 
     if isinstance(stats, dict) and "error" in stats:
@@ -260,12 +303,10 @@ async def get_ticker(symbol: str):
 
 
 @app.post("/tickers")
-async def get_tickers_batch(req: Dict = Body(...)):
+async def get_tickers_batch(req: TickersBatchRequest):
     """Obtiene precios de múltiples símbolos"""
-    symbols = req.get("symbols", [])
-
     results = {}
-    for symbol in symbols:
+    for symbol in req.symbols:
         ticker = market_client.get_ticker(symbol)
         if "error" not in ticker:
             results[symbol] = ticker
@@ -276,8 +317,24 @@ async def get_tickers_batch(req: Dict = Body(...)):
 @app.get("/market-status")
 async def get_status():
     # Helper para el dashboard
+    market_ok = False
+    coinex_ok = False
+    try:
+        ticker = market_client.get_ticker("BTC/USDT")
+        market_ok = not (isinstance(ticker, dict) and "error" in ticker)
+    except Exception:
+        market_ok = False
+
+    try:
+        public_coinex = TradingClient()
+        markets = public_coinex.get_all_markets(verified_only=False)
+        coinex_ok = not (isinstance(markets, dict) and "error" in markets)
+    except Exception:
+        coinex_ok = False
+
     return {
-        "connected_to_coinex": True,
+        "connected_to_coinex": coinex_ok,
+        "connected_to_okx": market_ok,
         "active_pairs": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"],
     }
 

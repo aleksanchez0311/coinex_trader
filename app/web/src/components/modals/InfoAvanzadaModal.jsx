@@ -5,6 +5,9 @@ const InfoAvanzadaModal = ({ isOpen, onClose, analysisData, symbol }) => {
   if (!isOpen || !analysisData) return null;
 
   const { analysis } = analysisData;
+  const structure = analysis?.estructura_mercado || {};
+  const trapPlans = analysis?.trampas_mercado || {};
+  const externalContext = analysis?.external_context || {};
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'transparent' }}>
@@ -102,6 +105,26 @@ const InfoAvanzadaModal = ({ isOpen, onClose, analysisData, symbol }) => {
             </div>
           )}
 
+          {analysis?.probable_sweeps && (
+            <div className="card">
+              <p className="font-label text-neutral mb-3">Sweeps Probables</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-neutral mb-1">Buy Side Sweep</p>
+                  <p className="font-data text-short">
+                    {analysis.probable_sweeps.buy_side ? `$${analysis.probable_sweeps.buy_side}` : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral mb-1">Sell Side Sweep</p>
+                  <p className="font-data text-long">
+                    {analysis.probable_sweeps.sell_side ? `$${analysis.probable_sweeps.sell_side}` : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Volumen */}
           {analysis?.volume && (
             <div className="card">
@@ -123,8 +146,8 @@ const InfoAvanzadaModal = ({ isOpen, onClose, analysisData, symbol }) => {
           {/* Derivados */}
           {analysisData.derivatives?.funding && (
             <div className="card">
-              <p className="font-label text-neutral mb-3">Datos de Derivados (CoinEx)</p>
-              <div className="grid grid-cols-3 gap-4">
+              <p className="font-label text-neutral mb-3">Datos de Derivados (OKX / Exchange activo)</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-neutral mb-1">Funding Rate</p>
                   <p className={`font-data text-sm ${analysisData.derivatives.funding.current > 0 ? 'text-short' : 'text-long'}`}>
@@ -139,9 +162,83 @@ const InfoAvanzadaModal = ({ isOpen, onClose, analysisData, symbol }) => {
                   <p className="text-xs text-neutral mb-1">Mark Price</p>
                   <p className="font-data text-sm text-textPrimary">${analysisData.derivatives.funding.mark_price?.toLocaleString()}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-neutral mb-1">Open Interest</p>
+                  <p className="font-data text-sm text-textPrimary">
+                    {analysisData.derivatives.open_interest?.value || analysisData.derivatives.open_interest?.amount || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              {(analysis?.derivatives_summary?.warnings || []).length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {analysis.derivatives_summary.warnings.map((warning, index) => (
+                    <p key={`${warning}-${index}`} className="text-[10px] text-amber-400">
+                      {warning}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!analysisData.derivatives?.funding && (analysis?.derivatives_summary?.warnings || []).length > 0 && (
+            <div className="card">
+              <p className="font-label text-neutral mb-3">Derivados (disponibilidad)</p>
+              <div className="space-y-1">
+                {analysis.derivatives_summary.warnings.map((warning, index) => (
+                  <p key={`${warning}-${index}`} className="text-[10px] text-amber-400">
+                    {warning}
+                  </p>
+                ))}
               </div>
             </div>
           )}
+
+          <div className="card">
+            <p className="font-label text-neutral mb-3">Estructura y Trampas</p>
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <p className="text-xs text-neutral mb-1">Tendencia</p>
+                <p className="font-data text-sm text-textPrimary">{structure.tendencia || analysis?.trend_detail || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral mb-1">BOS</p>
+                <p className="font-data text-sm text-textPrimary">{analysis?.bos ? 'Confirmado' : 'No'}</p>
+              </div>
+            </div>
+            {[trapPlans.bulltrap, trapPlans.beartrap].filter(Boolean).map((trap) => (
+              <div key={trap.tipo} className="mb-2 last:mb-0 rounded-lg bg-surface-elevated p-3">
+                <p className="text-xs text-white uppercase mb-1">{trap.tipo}</p>
+                <p className="text-[11px] text-gray-400">{trap.senal_confirmacion}</p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Contra-operacion: {trap.contra_operacion?.direccion} | Entry {trap.contra_operacion?.entry ?? 'N/A'} | SL {trap.contra_operacion?.stop_loss ?? 'N/A'}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <p className="font-label text-neutral mb-3">Contexto Externo</p>
+            {(externalContext.news || []).length > 0 ? (
+              <div className="space-y-2">
+                {externalContext.news.map((item, index) => (
+                  <div key={`${item.title}-${index}`} className="rounded-lg bg-surface-elevated p-3">
+                    <p className="text-xs text-textPrimary">{item.title}</p>
+                    <p className="text-[10px] text-neutral mt-1">{item.source || 'Fuente externa'}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">No hay news flow integrado disponible para este activo en este momento.</p>
+            )}
+            {(externalContext.notas || []).length > 0 && (
+              <div className="mt-3 space-y-1">
+                {externalContext.notas.map((note, index) => (
+                  <p key={`${note}-${index}`} className="text-[10px] text-gray-500">{note}</p>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

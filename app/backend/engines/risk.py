@@ -8,16 +8,21 @@ class RiskEngine:
         risk_per_trade_pct: float,
         entry_price: float,
         stop_loss: float,
-        leverage: int = 1,
+        leverage: int = 20,
     ) -> Dict:
         """
-        Cálculo de gestión de riesgo estricta.
+        Calculo de gestion de riesgo estricta con apalancamiento fijo 20x.
         """
+        if entry_price <= 0:
+            return {"error": "Entry price must be greater than zero"}
+        if leverage <= 0:
+            return {"error": "Leverage must be greater than zero"}
         if entry_price == stop_loss:
             return {"error": "Entry and Stop Loss cannot be the same"}
 
         risk_amount = capital * (risk_per_trade_pct / 100)
         risk_per_unit = abs(entry_price - stop_loss)
+        sl_distance_pct = (risk_per_unit / entry_price) * 100
 
         raw_position_size = risk_amount / risk_per_unit
 
@@ -54,7 +59,7 @@ class RiskEngine:
             "position_size": round(raw_position_size, 6),
             "notional_value": round(notional_value, 2),
             "margin_required": round(margin_required, 2),
-            "stop_loss_pct": round(abs(entry_price - stop_loss) / entry_price * 100, 2),
+            "stop_loss_pct": round(sl_distance_pct, 2),
             "leverage": leverage,
             "tp1": round(tp1, 2),
             "tp2": round(tp2, 2),
@@ -64,10 +69,100 @@ class RiskEngine:
         }
 
     @staticmethod
+    def calculate_position_with_70_pct(
+        capital: float,
+        risk_pct: float,
+        entry_price: float,
+        stop_loss: float,
+        leverage: int = 20,
+        operation_size_pct: float = 70.0,
+    ) -> Dict:
+        """
+        Calculo de tamano de posicion considerando tamano de operacion 70% del capital.
+        """
+        if entry_price <= 0:
+            return {"error": "Entry price must be greater than zero"}
+        if leverage <= 0:
+            return {"error": "Leverage must be greater than zero"}
+        if entry_price == stop_loss:
+            return {"error": "Entry and Stop Loss cannot be the same"}
+        if operation_size_pct <= 0 or operation_size_pct > 100:
+            return {"error": "Operation size percentage must be between 0 and 100"}
+
+        operation_capital = capital * (operation_size_pct / 100)
+        max_risk_amount = capital * (risk_pct / 100)
+
+        risk_per_unit = abs(entry_price - stop_loss)
+        sl_distance_pct = (risk_per_unit / entry_price) * 100
+
+        position_value = operation_capital * leverage
+        position_size = position_value / entry_price
+        margin_used = position_value / leverage
+
+        max_loss_pct = sl_distance_pct * leverage
+        potential_loss = (sl_distance_pct / 100) * position_value
+
+        if potential_loss > max_risk_amount:
+            adjusted_position_value = (max_risk_amount / sl_distance_pct) * 100
+            position_size = adjusted_position_value / entry_price
+            margin_used = adjusted_position_value / leverage
+            potential_loss = max_risk_amount
+            position_value = adjusted_position_value
+
+        tp_distance = abs(entry_price - stop_loss)
+
+        return {
+            "position_size": round(position_size, 6),
+            "notional_value": round(position_value, 2),
+            "margin_required": round(margin_used, 2),
+            "risk_amount": round(potential_loss, 2),
+            "risk_pct": risk_pct,
+            "stop_loss_pct": round(sl_distance_pct, 2),
+            "leverage": leverage,
+            "tp1": round(entry_price + tp_distance * 1.5, 2),
+            "tp2": round(entry_price + tp_distance * 2.5, 2),
+            "tp3": round(entry_price + tp_distance * 4.0, 2),
+            "rr_ratio": 1.5,
+            "valid_rr": True,
+            "parametros": {
+                "capital": round(capital, 2),
+                "operation_size_pct": operation_size_pct,
+                "operation_capital": round(operation_capital, 2),
+                "max_risk_pct": risk_pct,
+                "max_risk_amount": round(max_risk_amount, 2),
+                "apalancamiento": f"{leverage}x",
+            },
+            "entrada": {
+                "entry_price": round(entry_price, 2),
+                "stop_loss": round(stop_loss, 2),
+                "sl_distance": round(risk_per_unit, 2),
+                "sl_distance_pct": round(sl_distance_pct, 2),
+            },
+            "posicion": {
+                "tamano_operacion": round(operation_capital, 2),
+                "exposicion_total": round(position_value, 2),
+                "margen_usado": round(margin_used, 2),
+                "cantidad": round(position_size, 6),
+            },
+            "riesgo": {
+                "perdida_si_sl": round(potential_loss, 2),
+                "perdida_pct_capital": round((potential_loss / capital) * 100, 2),
+                "dentro_del_limite": potential_loss <= max_risk_amount,
+            },
+            "take_profits": {
+                "tp1": round(entry_price + tp_distance * 1.5, 2),
+                "tp2": round(entry_price + tp_distance * 2.5, 2),
+                "tp3": round(entry_price + tp_distance * 4.0, 2),
+            },
+            "rr_ratio": {
+                "tp1": 1.5,
+                "tp2": 2.5,
+                "tp3": 4.0,
+            },
+        }
+
+    @staticmethod
     def get_recommendations(analysis: Dict, scoring: Dict):
-        """
-        Genera recomendaciones de riesgo basadas en el análisis SMC + ATR
-        """
         last_price = analysis.get("last_price", 0)
         bias = analysis.get("bias", "Neutral")
 
@@ -157,7 +252,7 @@ class RiskEngine:
 
     @staticmethod
     def get_trade_plan(entry: float, stop: float, bias: str):
-        """Genera niveles de Take Profit con R:R mínimo 1.5"""
+        """Genera niveles de Take Profit con R:R minimo 1.5"""
         risk_dist = abs(entry - stop)
 
         if bias == "Alcista":

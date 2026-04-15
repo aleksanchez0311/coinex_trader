@@ -1,6 +1,5 @@
 import React from 'react';
 import { Target, Activity, Zap, BarChart3, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle, Play, RotateCw } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnalyzed, isFromCache }) => {
   if (!hasAnalyzed) return (
@@ -20,11 +19,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
 
   if (loading) return (
     <div className="glass p-6 md:p-10 flex flex-col items-center justify-center gap-4 min-h-[400px] md:min-h-[500px]">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        className="w-10 h-10 md:w-12 md:h-12 border-4 border-accent border-t-transparent rounded-full"
-      ></motion.div>
+      <div className="w-10 h-10 md:w-12 md:h-12 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
       <p className="text-accent animate-pulse font-bold tracking-widest uppercase text-xs">Analizando mercado...</p>
       {analysisStep && (
         <p className="text-gray-500 text-[10px] mt-2 hidden md:inline">{analysisStep}</p>
@@ -44,7 +39,9 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
   const preTradeChecks = analysis?.pre_trade_checks || {};
   const checksPassed = analysis?.checks_passed || 0;
   const totalChecks = analysis?.total_checks || 6;
-  const recommendation = analysis?.recommendation || scoring?.recommendation || "SIN DATOS";
+  const recommendation = analysis?.trading_plan?.sesgo_principal || analysis?.recommendation || scoring?.recommendation || "SIN DATOS";
+  const context = analysis?.trading_plan?.contexto_temporal || {};
+  const marketStructure = analysis?.estructura_mercado || {};
 
   const checkItems = [
     { key: "tendencia_ema", label: "Tendencia EMA" },
@@ -56,28 +53,19 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
   ];
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Score Header */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-        <motion.div 
-          whileHover={{ scale: 1.01 }}
-          className="col-span-1 md:col-span-5 glass p-4 md:p-6 flex flex-col items-center justify-center relative overflow-hidden"
-        >
+        <div className="col-span-1 md:col-span-5 glass p-4 md:p-6 flex flex-col items-center justify-center relative overflow-hidden">
           <span className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2 hidden md:inline">Setup Quality Score</span>
           <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2 md:hidden">Score</span>
           <div className="relative">
             <svg className="w-24 h-24 md:w-32 md:h-32 transform -rotate-90">
               <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/5" />
-              <motion.circle 
-                initial={{ strokeDashoffset: 364.4 }}
-                animate={{ strokeDashoffset: 364.4 - (364.4 * (scoring?.total_score || 0)) / 100 }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
+              <circle 
                 cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
                 strokeDasharray={364.4}
+                strokeDashoffset={364.4 - (364.4 * (scoring?.total_score || 0)) / 100}
                 className={(scoring?.total_score || 0) > 70 ? 'text-long' : (scoring?.total_score || 0) > 50 ? 'text-accent' : 'text-short'}
               />
             </svg>
@@ -86,13 +74,16 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
             </div>
           </div>
           <div className={`mt-3 font-bold text-center px-3 md:px-4 py-1 rounded-full text-xs uppercase ${
+            recommendation === 'LONG' ? 'bg-long/20 text-long' : 
+            recommendation === 'SHORT' ? 'bg-short/20 text-short' :
+            recommendation === 'NO TRADE' ? 'bg-white/10 text-gray-300' :
             recommendation.includes("ALTA") ? 'bg-long/20 text-long' : 
             recommendation.includes("MEDIA") ? 'bg-accent/20 text-accent' : 'bg-short/20 text-short'
           }`}>
             {recommendation}
           </div>
           <p className="text-[10px] text-gray-500 mt-2">Checks: {checksPassed}/{totalChecks}</p>
-        </motion.div>
+        </div>
 
         <div className="col-span-1 md:col-span-7 glass p-4 md:p-6">
           <div className="flex justify-between items-start mb-3 md:mb-4">
@@ -127,6 +118,10 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
               <p className="text-[10px] text-gray-500 uppercase font-bold">ATR</p>
               <p className="text-lg md:text-xl font-mono">${analysis?.atr || "---"}</p>
             </div>
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase font-bold">BOS</p>
+              <p className="text-sm md:text-base font-mono">{analysis?.bos ? 'Si' : 'No'}</p>
+            </div>
           </div>
           
           {/* Pre-Trade Checklist */}
@@ -144,17 +139,26 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
           
           <div className="space-y-2 mt-3 md:mt-4">
             {scoring?.confluences?.map((conf, i) => (
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                key={i} 
-                className="flex items-center gap-2 text-xs md:text-sm text-gray-300"
-              >
+              <div key={i} className="flex items-center gap-2 text-xs md:text-sm text-gray-300">
                 <div className="w-1 h-1 rounded-full bg-accent"></div>
                 {conf}
-              </motion.div>
+              </div>
             ))}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px] text-gray-400">
+            <div className="bg-surface/40 rounded-lg p-2 border border-border/40">
+              <span className="block uppercase text-gray-500 mb-1">Estructura</span>
+              {marketStructure?.tendencia || analysis?.trend_detail || 'N/D'}
+            </div>
+            <div className="bg-surface/40 rounded-lg p-2 border border-border/40">
+              <span className="block uppercase text-gray-500 mb-1">Fuente precio</span>
+              {context?.fuente_precio || 'OKX'}
+            </div>
+            <div className="bg-surface/40 rounded-lg p-2 border border-border/40">
+              <span className="block uppercase text-gray-500 mb-1">Hora local</span>
+              {context?.fecha_hora || 'N/D'}
+            </div>
           </div>
         </div>
       </div>
@@ -170,7 +174,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
           {loading ? 'Actualizando...' : 'Actualizar Análisis'}
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

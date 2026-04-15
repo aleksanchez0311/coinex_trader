@@ -6,6 +6,7 @@ const PlanOperativoButton = ({ analysisData, onOpenPlanModal, loading }) => {
   if (loading || !analysisData?.analysis?.trading_plan) return null;
   
   const { trading_plan } = analysisData.analysis;
+  const rb = trading_plan.riesgo_beneficio || {};
 
   return (
     <motion.div 
@@ -18,7 +19,10 @@ const PlanOperativoButton = ({ analysisData, onOpenPlanModal, loading }) => {
         <Layers className="text-accent" size={18} md:size={20} />
         <div>
           <h3 className="text-sm font-bold text-white uppercase">Plan Operativo (12-24h)</h3>
-          <p className="text-[10px] text-gray-500">{trading_plan.sesgo_principal} • {trading_plan.riesgo_beneficio || 'Sin setup'}</p>
+          <p className="text-[10px] text-gray-500">
+            {trading_plan.sesgo_principal} • {trading_plan.contexto_temporal?.apalancamiento_fijo || '20x'} • 
+            {rb.esperado || 'Sin R:R'}
+          </p>
         </div>
       </div>
       <button

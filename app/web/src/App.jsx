@@ -27,14 +27,15 @@ const App = () => {
   const [pnlStats, setPnlStats] = useState({ total_pnl: 0, count: 0 });
   const [pnlLoading, setPnlLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const analysisCountry = 'Cuba';
+  const DEFAULT_CAPITAL = 10;
   
   // Estado para Risk Management
-  const [capital, setCapital] = useState(30);
-  const [riskPct, setRiskPct] = useState(50);
+  const [capital, setCapital] = useState(DEFAULT_CAPITAL);
+  const [riskPct, setRiskPct] = useState(30);
   const [leverage, setLeverage] = useState(20);
   const [slPrice, setSlPrice] = useState(0);
   const [tpPrice, setTpPrice] = useState(0);
-  const [riskResult, setRiskResult] = useState(null);
   const [executing, setExecuting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -43,7 +44,7 @@ const App = () => {
   const [marginMode, setMarginMode] = useState('isolated');
   const [orderType, setOrderType] = useState('limit');
   const [entryPrice, setEntryPrice] = useState(null);
-  const [riskAmount, setRiskAmount] = useState(21);
+  const [riskAmount, setRiskAmount] = useState(7);
   const [currentTradeSide, setCurrentTradeSide] = useState(null);
   
   // Gestión de credenciales
@@ -137,12 +138,18 @@ const App = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           symbol,
+          country: analysisCountry || 'Cuba',
+          capital,
           api_key: credentials.apiKey,
           secret: credentials.apiSecret
         })
       });
       
       setAnalysisStep(`Procesando ${symbol} • Estructura SMC + EMA + RSI + ATR...`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error obteniendo análisis');
+      }
       const data = await response.json();
       
       setAnalysisData(data);
@@ -153,15 +160,50 @@ const App = () => {
     } finally {
       setIsLoading(false);
       setAnalysisStep('');
-      setIsFromCache(false);
+        setIsFromCache(false);
+      }
+  };
+
+  const resolvePositionSize = async () => {
+    const resolvedEntryPrice = Number(entryPrice) || Number(analysisData?.analysis?.last_price);
+    const resolvedStopLoss = Number(slPrice);
+
+    if (!resolvedEntryPrice || !resolvedStopLoss) {
+      throw new Error('Precio de entrada y stop loss son obligatorios');
     }
+
+    const response = await fetch(`${API_URL}/risk-management`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          capital,
+          risk_pct: 30,
+          entry_price: resolvedEntryPrice,
+          stop_loss: resolvedStopLoss,
+          take_profit: tpPrice || null,
+          leverage: 20,
+          operation_size_pct: 70
+        })
+      });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'No se pudo calcular el tamaño de posición');
+    }
+
+    const amount = data?.position?.position_size;
+    if (!amount || Number(amount) <= 0) {
+      throw new Error('El tamaño de posición calculado es inválido');
+    }
+
+    return Number(amount);
   };
 
   const handleSymbolSelect = (symbol) => {
     setSelectedSymbol(symbol);
   };
 
-  const calculateRisk = async () => {
+  const _calculateRisk = async () => {
     if (!analysisData?.analysis) {
       console.log("No hay analysisData aún");
       return;
@@ -181,11 +223,12 @@ const App = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           capital,
-          risk_pct: riskPct,
+          risk_pct: 30,
           entry_price: analysisData.analysis.last_price,
           stop_loss: slPrice || analysisData.risk_recommendations?.stop_loss,
           take_profit: tpPrice || null,
-          leverage
+          leverage: 20,
+          operation_size_pct: 70
         })
       });
       
@@ -209,7 +252,6 @@ const App = () => {
       }
 
       console.log(">>> Actualizando riskResult state...");
-      setRiskResult(data);
       
       if (data.plan?.tp1) {
         console.log(">>> Setting tpPrice to:", data.plan.tp1);
@@ -229,11 +271,9 @@ const App = () => {
       return;
     }
     setExecuting(true);
-    
-    const positionSize = riskAmount * leverage;
-    const tokenAmount = positionSize / entryPrice;
-    
+
     try {
+      const tokenAmount = await resolvePositionSize();
       const response = await fetch(`${API_URL}/execute-trade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -279,14 +319,17 @@ const App = () => {
     }
     setTpPrice(0);
     setSlPrice(0);
-    setRiskResult(null);
-    setCapital(30);
-    setRiskPct(50);
+    setCapital(DEFAULT_CAPITAL);
+    setRiskPct(30);
     setLeverage(20);
     setEntryPrice(null);
-    setRiskAmount(21);
+    setRiskAmount(7);
     setCurrentTradeSide(null);
   }, [selectedSymbol]);
+
+  useEffect(() => {
+    setRiskAmount(Math.round(capital * 0.7 * 100) / 100);
+  }, [capital]);
   
   useEffect(() => {
     if (autoAnalyzeEnabled && !hasAnalyzed && analysisData) {
@@ -298,8 +341,8 @@ const App = () => {
     if (analysisData?.risk_recommendations) {
       const recs = analysisData.risk_recommendations;
       setSlPrice(recs.stop_loss);
-      setRiskPct(recs.risk_pct);
-      setLeverage(recs.leverage);
+      setRiskPct(30);
+      setLeverage(20);
     } else if (analysisData?.analysis) {
       const currentPrice = analysisData.analysis.last_price;
       const dist = currentPrice * 0.02; 
@@ -317,12 +360,12 @@ const App = () => {
       const scenario = isLong ? tradingPlan.escenarios_alternativos?.long : tradingPlan.escenarios_alternativos?.short;
       
       setCurrentTradeSide(isLong ? 'buy' : 'sell');
-      setEntryPrice(tradingPlan.entry_ideal || tradingPlan.entry || analysisData.analysis.last_price);
+      setEntryPrice(tradingPlan.configuracion_entrada?.entry_ideal || tradingPlan.entry_ideal || tradingPlan.entry || analysisData.analysis.last_price);
       setSlPrice(scenario?.sl || tradingPlan.stop_loss?.nivel);
       setTpPrice(scenario?.tp1 || tradingPlan.take_profits?.[0]?.nivel);
       setLeverage(20);
-      setRiskAmount(Math.round(capital * 0.7));
-      setRiskPct(50);
+      setRiskAmount(Math.round(capital * 0.7 * 100) / 100);
+      setRiskPct(30);
       setShowConfirmModal(true);
     }
   };

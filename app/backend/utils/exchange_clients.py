@@ -3,6 +3,8 @@ import os
 import time
 from typing import Dict, List
 
+import requests
+
 
 class MarketDataClient:
     """Cliente para datos de mercado y análisis - EXCLUSIVAMENTE OKX"""
@@ -19,6 +21,32 @@ class MarketDataClient:
         if not sym.endswith("/USDT"):
             sym = sym.replace("USDT", "/USDT")
         return sym
+
+    def _coingecko_id(self, symbol: str) -> str | None:
+        base = symbol.split("/")[0].replace("-USDT", "").replace("USDT", "").upper()
+        mapping = {
+            "BTC": "bitcoin",
+            "ETH": "ethereum",
+            "SOL": "solana",
+            "BNB": "binancecoin",
+            "XRP": "ripple",
+            "ADA": "cardano",
+            "DOGE": "dogecoin",
+            "AVAX": "avalanche-2",
+            "DOT": "polkadot",
+            "LINK": "chainlink",
+            "LTC": "litecoin",
+            "UNI": "uniswap",
+            "ATOM": "cosmos",
+            "NEAR": "near",
+            "APT": "aptos",
+            "ARB": "arbitrum",
+            "OP": "optimism",
+        }
+        return mapping.get(base)
+
+    def _base_asset(self, symbol: str) -> str:
+        return symbol.split("/")[0].replace("-USDT", "").replace("USDT", "").upper()
 
     def _get_okx_markets(self) -> set:
         """Obtiene lista de mercados disponibles en OKX (~582 USDT) con cache"""
@@ -100,8 +128,14 @@ class MarketDataClient:
             return {"error": str(e)}
 
     def get_derivatives_data(self, symbol: str = "BTC/USDT:USDT") -> Dict:
-        """Obtiene datos de derivados: funding rate, liquidaciones"""
-        result = {"funding": None, "liquidations": None, "error": None}
+        """Obtiene datos de derivados: funding, open interest y liquidaciones."""
+        result = {
+            "funding": None,
+            "open_interest": None,
+            "liquidations": None,
+            "liquidation_zones": None,
+            "error": None,
+        }
         swap_sym = f"{self._normalize_symbol(symbol)}:USDT"
 
         try:
@@ -116,18 +150,127 @@ class MarketDataClient:
             result["error"] = f"Funding error: {e}"
 
         try:
+            open_interest = self.client.fetch_open_interest(swap_sym)
+            result["open_interest"] = {
+                "amount": open_interest.get("openInterestAmount")
+                or open_interest.get("openInterestValue")
+                or open_interest.get("openInterest"),
+                "value": open_interest.get("openInterestValue"),
+                "timestamp": open_interest.get("timestamp"),
+            }
+        except Exception as e:
+            result["open_interest_error"] = str(e)
+
+        try:
             liquidations = self.client.fetch_liquidations(swap_sym, limit=20)
             longs_liq = sum(1 for l in liquidations if l.get("side") == "buy")
             shorts_liq = sum(1 for l in liquidations if l.get("side") == "sell")
+            liquidation_prices = [
+                float(l.get("price") or l.get("info", {}).get("price") or 0)
+                for l in liquidations
+                if float(l.get("price") or l.get("info", {}).get("price") or 0) > 0
+            ]
             result["liquidations"] = {
                 "total": len(liquidations),
                 "longs": longs_liq,
                 "shorts": shorts_liq,
                 "recent": liquidations[:5],
             }
+            if liquidation_prices:
+                result["liquidation_zones"] = {
+                    "upper_cluster": round(max(liquidation_prices), 2),
+                    "lower_cluster": round(min(liquidation_prices), 2),
+                    "average_cluster": round(
+                        sum(liquidation_prices) / len(liquidation_prices), 2
+                    ),
+                }
         except Exception as e:
             result["liquidation_error"] = str(e)
 
+        return result
+
+    def get_market_context(self, symbol: str) -> Dict:
+        """Obtiene contexto externo complementario con degradacion segura."""
+        base_asset = self._base_asset(symbol)
+        result = {
+            "spot": None,
+            "news": [],
+            "macro": [],
+            "notes": [],
+        }
+        coin_id = self._coingecko_id(symbol)
+        if not coin_id:
+            result["notes"].append("No existe mapeo de CoinGecko para este activo.")
+            return result
+
+        try:
+            response = requests.get(
+                "https://api.coingecko.com/api/v3/simple/price",
+                params={
+                    "ids": coin_id,
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true",
+                    "include_market_cap": "true",
+                    "include_24hr_vol": "true",
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json().get(coin_id, {})
+            if payload:
+                result["spot"] = {
+                    "source": "CoinGecko",
+                    "price": payload.get("usd"),
+                    "change_24h_pct": payload.get("usd_24h_change"),
+                    "market_cap": payload.get("usd_market_cap"),
+                    "volume_24h": payload.get("usd_24h_vol"),
+                }
+        except Exception as e:
+            result["notes"].append(f"No se pudo obtener spot complementario: {e}")
+
+        try:
+            response = requests.get(
+                "https://min-api.cryptocompare.com/data/v2/news/",
+                params={
+                    "categories": f"{base_asset},regulation,blockchain",
+                    "excludeCategories": "Sponsored",
+                    "lang": "EN",
+                    "sortOrder": "latest",
+                    "extraParams": "CoinExTrader",
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            articles = payload.get("Data", [])[:5]
+            result["news"] = [
+                {
+                    "title": article.get("title"),
+                    "source": article.get("source_info", {}).get("name")
+                    or article.get("source"),
+                    "published_at": article.get("published_on"),
+                    "url": article.get("url"),
+                    "sentiment": article.get("categories"),
+                }
+                for article in articles
+                if article.get("title")
+            ]
+        except Exception as e:
+            result["notes"].append(f"No se pudo obtener news flow: {e}")
+
+        result["macro"] = [
+            {
+                "evento": "Sin calendario macro integrado",
+                "impacto": "Si hay CPI, FOMC, ETF flow o headlines regulatorios, deben validarse fuera de la app.",
+            },
+            {
+                "evento": "Fuente principal de estructura",
+                "impacto": "La estructura se calcula con OHLCV real de OKX, no con TradingView.",
+            },
+        ]
+        result["notes"].append(
+            "La app prioriza datos en tiempo real de OKX/CoinGecko/CoinEx cuando la fuente responde."
+        )
         return result
 
     def get_all_markets(self, verified_only: bool = False) -> List[Dict]:
@@ -359,7 +502,7 @@ class TradingClient:
 
             amount = float(self.client.amount_to_precision(symbol, amount))
         except Exception as e:
-            pass
+            return {"error": str(e)}
 
         try:
             if order_type == "market":
