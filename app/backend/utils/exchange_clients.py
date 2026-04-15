@@ -1,7 +1,7 @@
 import ccxt
 import os
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import requests
 
@@ -662,65 +662,127 @@ class TradingClient:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_realized_pnl(self, limit: int = 50) -> Dict:
-        """Obtiene el PnL total: realizado + no realizado + fees"""
+    @staticmethod
+    def _position_unrealized_realized(position: Dict) -> Tuple[float, float]:
+        """Lee PnL desde estructura unificada CCXT + fallback a info crudo CoinEx."""
+        info = position.get("info") or {}
+        u = position.get("unrealizedPnl")
+        r = position.get("realizedPnl")
+        if u is None:
+            u = info.get("unrealized_pnl")
+        if r is None:
+            r = info.get("realized_pnl")
         try:
-            total_pnl = 0.0
-            realized_pnl = 0.0
+            u_f = float(u) if u is not None else 0.0
+        except (TypeError, ValueError):
+            u_f = 0.0
+        try:
+            r_f = float(r) if r is not None else 0.0
+        except (TypeError, ValueError):
+            r_f = 0.0
+        return u_f, r_f
+
+    @staticmethod
+    def _trade_fee_cost(trade: Dict) -> float:
+        fee = trade.get("fee")
+        if isinstance(fee, dict) and fee.get("cost") is not None:
+            try:
+                return float(fee.get("cost") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        info = trade.get("info") or {}
+        try:
+            return float(info.get("fee", 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def get_realized_pnl(self, limit: int = 50) -> Dict:
+        """
+        PnL futuros CoinEx (swap): CCXT rellena realizedPnl / unrealizedPnl en posiciones.
+        Los user-deals de futuros no traen realized_pnl por fill; antes se leía info['realized_pnl']
+        (inexistente) y el acumulado salía 0.
+        """
+        try:
             unrealized_pnl = 0.0
+            realized_open = 0.0
+            realized_closed = 0.0
             total_fees = 0.0
-            pnl_records = []
-            positions = []
+            history: List[Dict] = []
+            positions_pending: List[Dict] = []
 
             try:
-                positions = self.client.fetch_positions()
-                for pos in positions:
-                    if pos.get("contracts", 0) > 0:
-                        un_pnl = float(pos.get("unrealizedPnl", 0) or 0)
-                        unrealized_pnl += un_pnl
+                self.client.load_markets()
             except Exception:
                 pass
 
             try:
-                symbols = list(
-                    set([p.get("symbol") for p in positions if p.get("symbol")])
-                )
-                for sym in symbols:
-                    try:
-                        trades = self.client.fetch_my_trades(
-                            sym, params={"type": "swap"}
+                positions_pending = self.client.fetch_positions() or []
+                for pos in positions_pending:
+                    u, r = self._position_unrealized_realized(pos)
+                    unrealized_pnl += u
+                    realized_open += r
+            except Exception:
+                positions_pending = []
+
+            page = 1
+            page_limit = min(max(limit, 10), 100)
+            max_pages = 200
+            method_finished = "v2PrivateGetFuturesFinishedPosition"
+
+            while page <= max_pages:
+                try:
+                    batch = self.client.fetch_positions(
+                        params={
+                            "method": method_finished,
+                            "page": page,
+                            "limit": page_limit,
+                        }
+                    )
+                except Exception:
+                    break
+                if not batch:
+                    break
+                for pos in batch:
+                    _, r = self._position_unrealized_realized(pos)
+                    realized_closed += r
+                    sym = pos.get("symbol")
+                    if sym and r != 0 and len(history) < 15:
+                        history.append(
+                            {
+                                "symbol": sym,
+                                "pnl": round(r, 8),
+                                "fee": 0.0,
+                                "time": pos.get("datetime"),
+                                "source": "finished_position",
+                            }
                         )
-                        for trade in trades:
-                            info = trade.get("info", {})
-                            pnl_val = float(info.get("realized_pnl", 0))
-                            fee_val = float(info.get("fee", 0) or 0)
+                if len(batch) < page_limit:
+                    break
+                page += 1
 
-                            realized_pnl += pnl_val
-                            total_fees += fee_val
+            symbols = list(
+                {p.get("symbol") for p in positions_pending if p.get("symbol")}
+            )
+            for sym in symbols[:20]:
+                try:
+                    trades = self.client.fetch_my_trades(sym, limit=80)
+                    for trade in trades or []:
+                        total_fees += self._trade_fee_cost(trade)
+                except Exception:
+                    continue
 
-                            if pnl_val != 0:
-                                pnl_records.append(
-                                    {
-                                        "symbol": trade.get("symbol"),
-                                        "pnl": pnl_val,
-                                        "fee": fee_val,
-                                        "time": trade.get("datetime"),
-                                    }
-                                )
-                    except:
-                        pass
-            except Exception:
-                pass
-
+            realized_pnl = realized_open + realized_closed
             total_pnl = realized_pnl + unrealized_pnl - total_fees
 
             return {
                 "total_pnl": round(total_pnl, 2),
                 "realized_pnl": round(realized_pnl, 2),
                 "unrealized_pnl": round(unrealized_pnl, 2),
+                "realized_from_open_positions": round(realized_open, 2),
+                "realized_from_closed_positions": round(realized_closed, 2),
                 "total_fees": round(total_fees, 2),
-                "count": len(pnl_records),
-                "history": pnl_records[:10],
+                "count": len(history),
+                "history": history[:10],
             }
         except Exception as e:
             return {"error": str(e)}
