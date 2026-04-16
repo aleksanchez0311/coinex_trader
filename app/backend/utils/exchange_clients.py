@@ -454,6 +454,58 @@ class TradingClient:
             "last_reset": time.time()
         }
 
+    def post_futures_private_with_retry(self, endpoint: str, data: dict = None, max_retries: int = 3) -> Dict:
+        """Realiza POST a endpoint privado de CoinEx con reintentos y backoff exponencial"""
+        for attempt in range(max_retries):
+            try:
+                # Aplicar rate limit antes de la solicitud
+                self.rate_limiter.wait_if_needed("futures")
+                
+                # Realizar la solicitud usando el cliente CCXT
+                if data:
+                    response = self.client.private_post_futures(endpoint, data)
+                else:
+                    response = self.client.private_post_futures(endpoint)
+                
+                # Verificar si hay error de rate limit en la respuesta
+                if hasattr(response, 'headers') and response.headers:
+                    if self.rate_limiter.handle_rate_limit_error(dict(response.headers)):
+                        continue  # Reintentar si hay rate limit
+                
+                # Verificar si la respuesta tiene error
+                if isinstance(response, dict) and response.get('code') != 0:
+                    error_msg = response.get('message', 'Unknown error')
+                    
+                    # Si es error de rate limit, esperar y reintentar
+                    if 'rate limit' in error_msg.lower() or 'too many requests' in error_msg.lower():
+                        wait_time = (2 ** attempt) * 0.5  # Backoff exponencial: 0.5s, 1s, 2s
+                        print(f">>> Rate limit error on attempt {attempt + 1}. Waiting {wait_time}s...")
+                        time.sleep(wait_time)
+                        continue
+                    
+                    # Otro tipo de error, no reintentar
+                    return {"error": error_msg, "code": response.get('code')}
+                
+                # Respuesta exitosa
+                return response
+                
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Si es error de rate limit o conexión, reintentar
+                if 'rate limit' in error_msg.lower() or 'timeout' in error_msg.lower() or 'connection' in error_msg.lower():
+                    if attempt < max_retries - 1:  # No esperar en el último intento
+                        wait_time = (2 ** attempt) * 0.5
+                        print(f">>> Retry attempt {attempt + 1}/{max_retries} after error: {error_msg[:50]}...")
+                        time.sleep(wait_time)
+                        continue
+                
+                # Error no recuperable
+                return {"error": error_msg}
+        
+        # Si todos los intentos fallaron
+        return {"error": f"Failed after {max_retries} attempts"}
+
     def _get_okx_verified_markets(self) -> set:
         """Obtiene mercados verificados desde OKX para cross-check"""
         try:
@@ -1027,15 +1079,45 @@ class TradingClient:
             # Aplicar rate limit
             self.rate_limiter.wait_if_needed("futures")
             
-            # Obtener PnL desde CoinEx
-            response = self.post_futures_private_with_retry("/futures/get-realized-pnl")
+            # Método 1: Usar endpoint correcto de CoinEx para obtener PnL de posiciones finalizadas
+            # Endpoint: /futures/finished-position
+            # Este endpoint devuelve unrealized_pnl y realized_pnl de posiciones cerradas
+            response = self.post_futures_private_with_retry("/futures/finished-position")
             
-            if response and not response.get("error"):
+            if response and not response.get("error") and response.get("code") == 0:
+                finished_positions = response.get("data", [])
+                
+                total_realized_pnl = 0.0
+                total_unrealized_pnl = 0.0
+                total_finished_positions = len(finished_positions)
+                
+                # Sumar PnL de todas las posiciones finalizadas
+                for position in finished_positions:
+                    realized_pnl = float(position.get("realized_pnl", 0))
+                    unrealized_pnl = float(position.get("unrealized_pnl", 0))
+                    
+                    total_realized_pnl += realized_pnl
+                    # Para posiciones finalizadas, unrealized_pnl debería ser 0, pero lo sumamos por si acaso
+                    total_unrealized_pnl += unrealized_pnl
+                
+                # También obtener posiciones activas para unrealized PnL actual
+                try:
+                    active_positions = self.client.fetch_positions()
+                    for pos in active_positions:
+                        if pos.get('contracts', 0) != 0:  # Solo posiciones activas
+                            total_unrealized_pnl += float(pos.get('unrealizedPnl', 0))
+                except:
+                    pass  # Si falla, mantenemos solo el PnL de posiciones finalizadas
+                
+                total_pnl = total_realized_pnl + total_unrealized_pnl
+                
                 result = {
-                    "realized_pnl": float(response.get("realized_pnl", 0)),
-                    "unrealized_pnl": float(response.get("unrealized_pnl", 0)),
-                    "total_pnl": float(response.get("total_pnl", 0)),
-                    "timestamp": time.time()
+                    "realized_pnl": total_realized_pnl,
+                    "unrealized_pnl": total_unrealized_pnl,
+                    "total_pnl": total_pnl,
+                    "finished_positions_count": total_finished_positions,
+                    "timestamp": time.time(),
+                    "method": "coinex_finished_positions"
                 }
                 
                 # Actualizar cache
@@ -1044,13 +1126,39 @@ class TradingClient:
                 # Incrementar contador
                 self._request_counters["pnl"] += 1
                 
-                print(f">>> PnL fetched: {result['total_pnl']} USDT (cached for 3s)")
+                print(f">>> PnL fetched from {total_finished_positions} finished positions: {result['total_pnl']} USDT (realized: {result['realized_pnl']}, unrealized: {result['unrealized_pnl']}) - cached for 3s")
                 return result
-            else:
-                print(">>> No PnL data found")
-                result = {"realized_pnl": 0, "unrealized_pnl": 0, "total_pnl": 0, "timestamp": time.time()}
-                self._update_cache("pnl", result)
-                return result
+            
+            # Método 2: Calcular desde posiciones si el endpoint no funciona
+            print(">>> API endpoint failed, calculating PnL from positions...")
+            positions = self.client.fetch_positions()
+            
+            realized_pnl = 0.0
+            unrealized_pnl = 0.0
+            
+            for pos in positions:
+                if pos.get('contracts', 0) != 0:  # Solo posiciones activas
+                    unrealized_pnl += float(pos.get('unrealizedPnl', 0))
+                    realized_pnl += float(pos.get('realizedPnl', 0))
+            
+            total_pnl = realized_pnl + unrealized_pnl
+            
+            result = {
+                "realized_pnl": realized_pnl,
+                "unrealized_pnl": unrealized_pnl,
+                "total_pnl": total_pnl,
+                "timestamp": time.time(),
+                "method": "calculated_from_positions"
+            }
+            
+            # Actualizar cache
+            self._update_cache("pnl", result)
+            
+            # Incrementar contador
+            self._request_counters["pnl"] += 1
+            
+            print(f">>> PnL calculated from positions: {result['total_pnl']} USDT (cached for 3s)")
+            return result
                 
         except Exception as e:
             print(f">>> Error fetching PnL: {str(e)}")

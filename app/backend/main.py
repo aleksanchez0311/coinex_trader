@@ -41,7 +41,7 @@ async def validation_exception_handler(req, exc):
 
 
 # Configuración de CORS para el frontend
-cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://coinex-trader.vercel.app")
 cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -242,7 +242,7 @@ async def execute_trade(req: TradeExecutionRequest):
 async def get_balance(req: CredentialsRequest):
     """Obtiene el balance de la cuenta (Swap por defecto)"""
     client = TradingClient(api_key=req.api_key, secret=req.secret)
-    balance = client.get_balance()
+    balance = client.get_balance_fast()
 
     if "error" in balance:
         raise HTTPException(status_code=400, detail=balance["error"])
@@ -254,7 +254,7 @@ async def get_balance(req: CredentialsRequest):
 async def get_positions(req: CredentialsRequest):
     """Obtiene las posiciones abiertas"""
     client = TradingClient(api_key=req.api_key, secret=req.secret)
-    positions = client.get_positions()
+    positions = client.get_positions_fast()
 
     if isinstance(positions, dict) and "error" in positions:
         raise HTTPException(status_code=400, detail=positions["error"])
@@ -278,7 +278,7 @@ async def close_position(req: ClosePositionRequest):
 async def get_pnl_stats(req: CredentialsRequest):
     """Obtiene estadísticas de PnL de CoinEx"""
     client = TradingClient(api_key=req.api_key, secret=req.secret)
-    stats = client.get_realized_pnl()
+    stats = client.get_realized_pnl_fast()
 
     if isinstance(stats, dict) and "error" in stats:
         raise HTTPException(status_code=400, detail=stats["error"])
