@@ -503,6 +503,12 @@ class AnalysisEngine:
             bias_score -= 2
             bias_reasons.append("OI decreciente")
         
+        # Calculate support and resistance for price position
+        support = min(liquidity["lows"]) if liquidity["lows"] else current_price - atr * 2
+        resistance = (
+            max(liquidity["highs"]) if liquidity["highs"] else current_price + atr * 2
+        )
+        
         # Price position weight: 10%
         price_position = (current_price - support) / (resistance - support)
         if price_position > 0.7:  # Near resistance
@@ -548,11 +554,6 @@ class AnalysisEngine:
         }
 
         checks_passed = sum(checks.values())
-
-        support = min(liquidity["lows"]) if liquidity["lows"] else current_price - atr * 2
-        resistance = (
-            max(liquidity["highs"]) if liquidity["highs"] else current_price + atr * 2
-        )
 
         invalidation = (
             support - (atr * 1.5) if bias == "Alcista" else resistance + (atr * 1.5)
