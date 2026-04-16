@@ -575,6 +575,14 @@ class AnalysisEngine:
         last_close = float(self.df["close"].iloc[-1])
         current_price = float(ticker.get("last") or last_close)
 
+        # Extraer ATR y RSI temprano para evitar UnboundLocalError
+        rsi = float(indicators.get("rsi", 70) or 50)
+        atr = float(indicators.get("atr", 0) or 0)
+        if atr <= 0:
+            return {
+                "error": "No se pudo calcular el analisis. ATR invalido o precio no disponible."
+            }
+
         ema_20 = indicators.get("ema_20", 0)
         ema_50 = indicators.get("ema_50", 0)
         ema_200 = indicators.get("ema_200", 0)
@@ -656,13 +664,6 @@ class AnalysisEngine:
             bias = "Neutral"
         
         print(f">>> Bias calculation: score={bias_score}, reasons={bias_reasons}, final={bias}")
-
-        rsi = float(indicators.get("rsi", 70) or 50)
-        atr = float(indicators.get("atr", 0) or 0)
-        if atr <= 0:
-            return {
-                "error": "No se pudo calcular el analisis. ATR invalido o precio no disponible."
-            }
 
         sl_data = self.calculate_sl_based_on_atr(bias, current_price, atr)
 

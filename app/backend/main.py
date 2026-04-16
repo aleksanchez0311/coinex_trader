@@ -1,9 +1,10 @@
 import os
 from dotenv import load_dotenv
-from typing import Dict
+from typing import Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import numpy as np
 import time
 from engines.analysis import AnalysisEngine
 from engines.scoring import ScoringEngine
@@ -21,6 +22,28 @@ from models.trading import (
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+
+def convert_numpy_types(obj: Any) -> Any:
+    """
+    Convierte recursivamente tipos numpy a tipos Python estándar para JSON serialization
+    """
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    else:
+        return obj
 
 load_dotenv()
 
@@ -116,13 +139,16 @@ async def analyze_pair(req: AnalysisRequest):
     risk_engine = RiskEngine()
     risk_recommendations = risk_engine.get_recommendations(analysis, score_result)
 
-    return {
+    result = {
         "symbol": symbol,
         "analysis": analysis,
         "scoring": score_result,
         "risk_recommendations": risk_recommendations,
         "derivatives": derivatives,
     }
+    
+    # Convertir todos los tipos numpy a tipos Python estándar
+    return convert_numpy_types(result)
 
 
 @app.post("/risk-management")
@@ -268,7 +294,7 @@ async def get_positions(req: CredentialsRequest):
     if isinstance(positions, dict) and "error" in positions:
         raise HTTPException(status_code=400, detail=positions["error"])
 
-    return positions
+    return convert_numpy_types(positions)
 
 
 @app.post("/open-orders")
@@ -280,7 +306,7 @@ async def get_open_orders(req: CredentialsRequest):
     if isinstance(orders, dict) and "error" in orders:
         raise HTTPException(status_code=400, detail=orders["error"])
 
-    return orders
+    return convert_numpy_types(orders)
 
 
 @app.post("/cancel-order")
@@ -326,7 +352,7 @@ async def get_pnl_stats(req: CredentialsRequest):
     if isinstance(stats, dict) and "error" in stats:
         raise HTTPException(status_code=400, detail=stats["error"])
 
-    return stats
+    return convert_numpy_types(stats)
 
 @app.post("/check-position")
 async def check_position(req: CredentialsRequest, market: str):
