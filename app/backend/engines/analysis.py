@@ -298,19 +298,148 @@ class AnalysisEngine:
         liquidation_zones = liquidation_zones or {}
         upper_liq = liquidation_zones.get("upper_cluster")
         lower_liq = liquidation_zones.get("lower_cluster")
-        near_resistance = resistance > 0 and abs(current_price - resistance) / current_price < 0.003
-        near_support = support > 0 and abs(current_price - support) / current_price < 0.003
-        near_upper_liq = bool(upper_liq) and abs(current_price - upper_liq) / current_price < 0.004
-        near_lower_liq = bool(lower_liq) and abs(current_price - lower_liq) / current_price < 0.004
+        
+        # Cálculo de distancia a zonas clave
+        dist_to_resistance = abs(current_price - resistance) / current_price if resistance > 0 else float('inf')
+        dist_to_support = abs(current_price - support) / current_price if support > 0 else float('inf')
+        dist_to_upper_liq = abs(current_price - upper_liq) / current_price if upper_liq else float('inf')
+        dist_to_lower_liq = abs(current_price - lower_liq) / current_price if lower_liq else float('inf')
+        
+        # Umbrales de proximidad
+        near_resistance = dist_to_resistance < 0.003
+        near_support = dist_to_support < 0.003
+        near_upper_liq = dist_to_upper_liq < 0.004
+        near_lower_liq = dist_to_lower_liq < 0.004
+        
+        # Cálculo de probabilidad de trap (0-100%)
+        bull_trap_probability = 0
+        bear_trap_probability = 0
+        
+        # Bull Trap: Sesgo alcista + cerca de zona peligrosa
+        if bias == "Alcista":
+            factors = []
+            if near_resistance: factors.append(30)  # Cerca de resistencia
+            if near_upper_liq: factors.append(25)  # Cerca de liquidez superior
+            if funding_rate > 0.0008: factors.append(25)  # Funding sobrecargado
+            if volume_ratio < 1.05: factors.append(20)  # Volumen bajo
+            
+            bull_trap_probability = sum(factors)
+            
+        # Bear Trap: Sesgo bajista + cerca de zona peligrosa  
+        elif bias == "Bajista":
+            factors = []
+            if near_support: factors.append(30)  # Cerca de soporte
+            if near_lower_liq: factors.append(25)  # Cerca de liquidez inferior
+            if funding_rate < -0.0008: factors.append(25)  # Funding extremo negativo
+            if volume_ratio < 1.05: factors.append(20)  # Volumen bajo
+            
+            bear_trap_probability = sum(factors)
+        
         return {
-            "bull_trap": bias == "Alcista"
-            and (near_resistance or near_upper_liq)
-            and funding_rate > 0.0008
-            and volume_ratio < 1.05,
-            "bear_trap": bias == "Bajista"
-            and (near_support or near_lower_liq)
-            and funding_rate < -0.0008
-            and volume_ratio < 1.05,
+            "bull_trap": {
+                "active": bull_trap_probability > 50,
+                "probability": min(bull_trap_probability, 100),
+                "factors": {
+                    "near_resistance": near_resistance,
+                    "near_upper_liq": near_upper_liq,
+                    "funding_high": funding_rate > 0.0008,
+                    "volume_low": volume_ratio < 1.05
+                }
+            },
+            "bear_trap": {
+                "active": bear_trap_probability > 50,
+                "probability": min(bear_trap_probability, 100),
+                "factors": {
+                    "near_support": near_support,
+                    "near_lower_liq": near_lower_liq,
+                    "funding_extreme": funding_rate < -0.0008,
+                    "volume_low": volume_ratio < 1.05
+                }
+            }
+        }
+
+    def _verify_position_vs_traps(
+        self,
+        proposed_entry: float,
+        proposed_direction: str,
+        current_price: float,
+        support: float,
+        resistance: float,
+        funding_rate: float,
+        volume_ratio: float,
+        liquidation_zones: Optional[Dict] = None,
+    ) -> Dict:
+        """Verifica si la posición propuesta caería en zona de trap"""
+        
+        # Calcular distancias relativas
+        dist_to_resistance = abs(current_price - resistance) / current_price if resistance > 0 else float('inf')
+        dist_to_support = abs(current_price - support) / current_price if support > 0 else float('inf')
+        
+        # Obtener zonas de liquidación
+        liquidation_zones = liquidation_zones or {}
+        upper_liq = liquidation_zones.get("upper_cluster")
+        lower_liq = liquidation_zones.get("lower_cluster")
+        
+        # Calcular distancias a zonas de liquidez
+        dist_to_upper_liq = abs(current_price - upper_liq) / current_price if upper_liq else float('inf')
+        dist_to_lower_liq = abs(current_price - lower_liq) / current_price if lower_liq else float('inf')
+        
+        # Umbrales de peligro
+        danger_threshold = 0.005  # 0.5%
+        trap_zone_threshold = 0.004  # 0.4%
+        
+        # Verificar si la entrada propuesta está en zona peligrosa
+        in_danger_zone = False
+        trap_risk = "BAJO"
+        trap_probability = 0
+        
+        if proposed_direction.upper() == "LONG":
+            # LONG: Verificar si está cerca de resistencia o liquidez superior
+            if (dist_to_resistance < danger_threshold or 
+                dist_to_upper_liq < trap_zone_threshold):
+                in_danger_zone = True
+                trap_risk = "ALTO"
+                
+                # Calcular probabilidad de bull trap
+                factors = []
+                if dist_to_resistance < danger_threshold: factors.append(35)
+                if dist_to_upper_liq < trap_zone_threshold: factors.append(30)
+                if funding_rate > 0.0008: factors.append(20)
+                if volume_ratio < 1.05: factors.append(15)
+                
+                trap_probability = min(sum(factors), 100)
+                
+        elif proposed_direction.upper() == "SHORT":
+            # SHORT: Verificar si está cerca de soporte o liquidez inferior
+            if (dist_to_support < danger_threshold or 
+                dist_to_lower_liq < trap_zone_threshold):
+                in_danger_zone = True
+                trap_risk = "ALTO"
+                
+                # Calcular probabilidad de bear trap
+                factors = []
+                if dist_to_support < danger_threshold: factors.append(35)
+                if dist_to_lower_liq < trap_zone_threshold: factors.append(30)
+                if funding_rate < -0.0008: factors.append(20)
+                if volume_ratio < 1.05: factors.append(15)
+                
+                trap_probability = min(sum(factors), 100)
+        
+        return {
+            "en_zona_peligrosa": in_danger_zone,
+            "trap_riesgo": trap_risk,
+            "probabilidad_trap": trap_probability,
+            "distancia_resistencia": round(dist_to_resistance * 100, 2) if dist_to_resistance != float('inf') else None,
+            "distancia_soporte": round(dist_to_support * 100, 2) if dist_to_support != float('inf') else None,
+            "distancia_liq_superior": round(dist_to_upper_liq * 100, 2) if dist_to_upper_liq != float('inf') else None,
+            "distancia_liq_inferior": round(dist_to_lower_liq * 100, 2) if dist_to_lower_liq != float('inf') else None,
+            "recomendacion": {
+                "accion": "CONTRARRESTAR" if in_danger_zone else "PROCEDER",
+                "justificacion": (
+                    f"Posición {proposed_direction} con {trap_probability}% de probabilidad de trap. "
+                    f"{'Evitar entrada y esperar contra-ataque' if in_danger_zone else 'Entrada con riesgo moderado'}."
+                )
+            }
         }
 
     def _build_contingency_trade(
@@ -672,6 +801,31 @@ class AnalysisEngine:
             liquidation_zones,
         )
 
+        # Verificar si la posición propuesta caería en zona de trap
+        proposed_entry = None
+        proposed_direction = None
+        if bias == "Alcista":
+            proposed_entry = round(min(resistance, current_price + atr * 0.35), 4)
+            proposed_direction = "LONG"
+        elif bias == "Bajista":
+            proposed_entry = round(max(support, current_price - atr * 0.35), 4)
+            proposed_direction = "SHORT"
+        else:
+            proposed_entry = current_price
+            proposed_direction = "NEUTRAL"
+
+        # Verificar riesgo de trap para la posición propuesta
+        trap_risk_analysis = self._verify_position_vs_traps(
+            proposed_entry=proposed_entry,
+            proposed_direction=proposed_direction,
+            current_price=current_price,
+            support=support,
+            resistance=resistance,
+            funding_rate=funding_rate,
+            volume_ratio=float(volume.get("ratio", 0) or 0),
+            liquidation_zones=liquidation_zones,
+        )
+
         long_entry = round(max(support, current_price - atr * 0.35), 4)
         short_entry = round(min(resistance, current_price + atr * 0.35), 4)
         long_sl = round(min(invalidation, long_entry - atr * 1.2), 4)
@@ -697,6 +851,9 @@ class AnalysisEngine:
             reason = "Riesgo de bull trap en resistencia con funding sobrecargado."
         elif bias == "Bajista" and traps["bear_trap"]:
             reason = "Riesgo de bear trap en soporte con funding extremo."
+        elif trap_risk_analysis["en_zona_peligrosa"]:
+            reason = f"Posición {proposed_direction} con {trap_risk_analysis['probabilidad_trap']}% de probabilidad de trap. {trap_risk_analysis['recomendacion']['justificacion']}"
+            decision = "NO TRADE"  # Esperar contra-ataque
         else:
             decision = "LONG" if bias == "Alcista" else "SHORT"
 
@@ -777,6 +934,12 @@ class AnalysisEngine:
                 "justificacion": justification,
                 "estructura": technical_reason,
                 "derivados": derivatives_reason,
+            },
+            "analisis_trap": {
+                "propuesta_entry": proposed_entry,
+                "propuesta_direccion": proposed_direction,
+                "riesgo_trap": trap_risk_analysis,
+                "recomendacion_trap": trap_risk_analysis.get("recomendacion", {}),
             },
             "estructura_mercado": {
                 "tendencia": bias,

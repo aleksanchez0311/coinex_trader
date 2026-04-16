@@ -42,6 +42,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
   const recommendation = analysis?.trading_plan?.sesgo_principal || analysis?.recommendation || scoring?.recommendation || "SIN DATOS";
   const context = analysis?.trading_plan?.contexto_temporal || {};
   const marketStructure = analysis?.estructura_mercado || {};
+  const trapAnalysis = analysis?.analisis_trap || {};
 
   const checkItems = [
     { key: "tendencia_ema", label: "Tendencia EMA" },
@@ -145,6 +146,99 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
               </div>
             ))}
           </div>
+
+          {/* Análisis de Traps */}
+          {trapAnalysis && (
+            <div className="mt-4 p-4 bg-surface/40 rounded-lg border border-border/40">
+              <h4 className="text-sm font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
+                <Target size={16} className="text-accent" />
+                Análisis de Traps
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {/* Propuesta y Riesgo */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Posición Propuesta:</span>
+                    <span className={`font-bold ${
+                      trapAnalysis?.propuesta_direccion === 'LONG' ? 'text-long' : 
+                      trapAnalysis?.propuesta_direccion === 'SHORT' ? 'text-short' : 'text-gray-400'
+                    }`}>
+                      {trapAnalysis?.propuesta_direccion || 'N/D'} @ {trapAnalysis?.propuesta_entry || '---'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Riesgo de Trap:</span>
+                    <span className={`font-bold ${
+                      trapAnalysis?.riesgo_trap?.trap_riesgo === 'ALTO' ? 'text-short' : 
+                      trapAnalysis?.riesgo_trap?.trap_riesgo === 'BAJO' ? 'text-long' : 'text-gray-400'
+                    }`}>
+                      {trapAnalysis?.riesgo_trap?.trap_riesgo || 'BAJO'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Probabilidad:</span>
+                    <span className={`font-bold ${
+                      (trapAnalysis?.probabilidad_trap || 0) > 60 ? 'text-short' : 
+                      (trapAnalysis?.probabilidad_trap || 0) > 30 ? 'text-accent' : 'text-long'
+                    }`}>
+                      {trapAnalysis?.probabilidad_trap || 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Recomendación */}
+                <div className="space-y-2">
+                  <div className="text-gray-500 text-xs mb-2">Recomendación:</div>
+                  <div className={`p-3 rounded border text-xs ${
+                    trapAnalysis?.recomendacion_trap?.accion === 'CONTRARRESTAR' ? 
+                      'bg-short/10 border-short/30 text-short' : 
+                      'bg-long/10 border-long/30 text-long'
+                  }`}>
+                    <div className="font-bold mb-1">
+                      {trapAnalysis?.recomendacion_trap?.accion || 'PROCEDER'}
+                    </div>
+                    <div className="text-gray-400">
+                      {trapAnalysis?.recomendacion_trap?.justificacion || 'Sin análisis de riesgo'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Distancias */}
+                <div className="space-y-2">
+                  <div className="text-gray-500 text-xs mb-2">Distancias a Zonas Clave:</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {trapAnalysis?.distancia_resistencia !== null && (
+                      <div className="flex justify-between">
+                        <span>A Resistencia:</span>
+                        <span className="font-mono">{trapAnalysis?.distancia_resistencia}%</span>
+                      </div>
+                    )}
+                    {trapAnalysis?.distancia_soporte !== null && (
+                      <div className="flex justify-between">
+                        <span>A Soporte:</span>
+                        <span className="font-mono">{trapAnalysis?.distancia_soporte}%</span>
+                      </div>
+                    )}
+                    {trapAnalysis?.distancia_liq_superior !== null && (
+                      <div className="flex justify-between">
+                        <span>A Liquidez Superior:</span>
+                        <span className="font-mono">{trapAnalysis?.distancia_liq_superior}%</span>
+                      </div>
+                    )}
+                    {trapAnalysis?.distancia_liq_inferior !== null && (
+                      <div className="flex justify-between">
+                        <span>A Liquidez Inferior:</span>
+                        <span className="font-mono">{trapAnalysis?.distancia_liq_inferior}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px] text-gray-400">
             <div className="bg-surface/40 rounded-lg p-2 border border-border/40">
