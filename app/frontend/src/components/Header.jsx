@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bell, ChevronDown, RefreshCw, Menu, ArrowLeft } from 'lucide-react';
 
-const Header = ({ pnlStats, pnlLoading, onToggleSidebar, sidebarOpen, onCloseSidebar }) => {
+const Header = ({ pnlStats, pnlLoading, exchangeBalance, balanceLoading, onToggleSidebar, sidebarOpen, onCloseSidebar }) => {
   return (
     <header className="h-16 md:h-20 border-b border-border px-3 md:px-6 flex items-center justify-between bg-surface/20 backdrop-blur-xl sticky top-0 z-10">
       <div className="flex items-center gap-2 md:gap-4">
@@ -32,6 +32,20 @@ const Header = ({ pnlStats, pnlLoading, onToggleSidebar, sidebarOpen, onCloseSid
       </div>
 
       <div className="flex items-center gap-2 md:gap-4">
+        {/* Balance - visible en tablet+ */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border bg-surface/50 border-border">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Balance:</span>
+          {balanceLoading ? (
+            <RefreshCw size={12} className="animate-spin text-accent" />
+          ) : (
+            <span className={`text-xs font-mono font-bold ${
+              exchangeBalance && exchangeBalance > 0 ? 'text-long' : 'text-short'
+            }`}>
+              {exchangeBalance ? `${exchangeBalance.toFixed(2)} USDT` : '0.00 USDT'}
+            </span>
+          )}
+        </div>
+
         {/* PnL - visible en tablet+ */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border bg-surface/50 border-border">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">PnL Acumulado:</span>

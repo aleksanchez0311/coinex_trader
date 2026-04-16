@@ -61,9 +61,9 @@ class RiskEngine:
             "margin_required": round(margin_required, 2),
             "stop_loss_pct": round(sl_distance_pct, 2),
             "leverage": leverage,
-            "tp1": round(tp1, 2),
-            "tp2": round(tp2, 2),
-            "tp3": round(tp3, 2),
+            "tp1": round(tp1, 4),
+            "tp2": round(tp2, 4),
+            "tp3": round(tp3, 4),
             "rr_ratio": 1.5,
             "valid_rr": True,
         }
@@ -119,9 +119,9 @@ class RiskEngine:
             "risk_pct": risk_pct,
             "stop_loss_pct": round(sl_distance_pct, 2),
             "leverage": leverage,
-            "tp1": round(entry_price + tp_distance * 1.5, 2),
-            "tp2": round(entry_price + tp_distance * 2.5, 2),
-            "tp3": round(entry_price + tp_distance * 4.0, 2),
+            "tp1": round(entry_price + tp_distance * 1.5, 4),
+            "tp2": round(entry_price + tp_distance * 2.5, 4),
+            "tp3": round(entry_price + tp_distance * 4.0, 4),
             "rr_ratio": 1.5,
             "valid_rr": True,
             "parametros": {
@@ -133,9 +133,9 @@ class RiskEngine:
                 "apalancamiento": f"{leverage}x",
             },
             "entrada": {
-                "entry_price": round(entry_price, 2),
-                "stop_loss": round(stop_loss, 2),
-                "sl_distance": round(risk_per_unit, 2),
+                "entry_price": round(entry_price, 4),
+                "stop_loss": round(stop_loss, 4),
+                "sl_distance": round(risk_per_unit, 4),
                 "sl_distance_pct": round(sl_distance_pct, 2),
             },
             "posicion": {
@@ -150,9 +150,9 @@ class RiskEngine:
                 "dentro_del_limite": potential_loss <= max_risk_amount,
             },
             "take_profits": {
-                "tp1": round(entry_price + tp_distance * 1.5, 2),
-                "tp2": round(entry_price + tp_distance * 2.5, 2),
-                "tp3": round(entry_price + tp_distance * 4.0, 2),
+                "tp1": round(entry_price + tp_distance * 1.5, 4),
+                "tp2": round(entry_price + tp_distance * 2.5, 4),
+                "tp3": round(entry_price + tp_distance * 4.0, 4),
             },
             "rr_ratio": {
                 "tp1": 1.5,
@@ -240,7 +240,7 @@ class RiskEngine:
             recommended_leverage = 10
 
         return {
-            "stop_loss": round(recommended_sl, 2),
+            "stop_loss": round(recommended_sl, 4),
             "risk_pct": recommended_risk,
             "leverage": recommended_leverage,
             "sl_found_via_smc": sl_found,
@@ -267,9 +267,9 @@ class RiskEngine:
         return {
             "entry": entry,
             "stop_loss": stop,
-            "tp1": round(tp1, 2),
-            "tp2": round(tp2, 2),
-            "tp3": round(tp3, 2),
+            "tp1": round(tp1, 4),
+            "tp2": round(tp2, 4),
+            "tp3": round(tp3, 4),
             "rr_ratio": 1.5,
             "min_rr_required": 1.5,
             "valid": True,

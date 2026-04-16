@@ -17,10 +17,12 @@ const ConfirmOrderModal = ({
   tpPrice,
   setTpPrice,
   riskAmount,
+  setRiskAmount,
   currentTradeSide,
   executing,
   onConfirm,
-  tradingPlan
+  tradingPlan,
+  exchangeBalance
 }) => {
   if (!isOpen) return null;
 
@@ -30,6 +32,20 @@ const ConfirmOrderModal = ({
   const sls = scenario
     ? [scenario.sl, scenario.entry - (scenario.entry - scenario.sl) * 0.5, scenario.entry + (scenario.sl - scenario.entry) * 0.5]
     : [];
+
+  // Validación de saldo disponible
+  const maxAvailableAmount = exchangeBalance ? Number(exchangeBalance) : 0;
+  const isAmountExceedingBalance = riskAmount > maxAvailableAmount;
+  const handleAmountChange = (value) => {
+    const newAmount = Number(value);
+    // No permitir que el monto exceda el saldo disponible
+    if (newAmount <= maxAvailableAmount || maxAvailableAmount === 0) {
+      setRiskAmount(newAmount);
+    } else {
+      // Si excede, establecer al máximo permitido
+      setRiskAmount(maxAvailableAmount);
+    }
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-3" style={{ backgroundColor: 'transparent' }}>
@@ -71,16 +87,42 @@ const ConfirmOrderModal = ({
           </div>
 
           <div>
-            <label className="font-label text-neutral block mb-2 text-sm">Margen Utilizado (70% capital)</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="font-label text-neutral block text-sm">Monto a Operar (USDT)</label>
+              <span className="text-xs text-neutral">
+                Disponible: <span className={`font-semibold ${maxAvailableAmount > 0 ? 'text-long' : 'text-short'}`}>
+                  {maxAvailableAmount > 0 ? `${maxAvailableAmount.toFixed(2)} USDT` : 'Cargando...'}
+                </span>
+              </span>
+            </div>
             <input
               type="number"
               value={riskAmount}
-              disabled
-              className="w-full bg-surface border border-border rounded-md px-3 py-2 md:py-2.5 font-data text-textPrimary text-sm"
+              onChange={(e) => handleAmountChange(e.target.value)}
+              max={maxAvailableAmount}
+              className={`w-full bg-surface border rounded-md px-3 py-2 md:py-2.5 font-data text-textPrimary text-sm focus:outline-none ${
+                isAmountExceedingBalance 
+                  ? 'border-short focus:border-short' 
+                  : 'border-border focus:border-long'
+              }`}
+              placeholder={`Máximo: ${maxAvailableAmount > 0 ? maxAvailableAmount.toFixed(2) : '...'}`}
             />
-            <p className="text-xs text-neutral mt-2">
-              Margen: <span className="text-textPrimary">{riskAmount} USDT</span> | Exposicion: <span className="text-textPrimary">{riskAmount * leverage} USDT</span>
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-neutral">
+                Margen: <span className="text-textPrimary">{riskAmount} USDT</span> | 
+                Exposicion: <span className="text-textPrimary">{riskAmount * leverage} USDT</span>
+              </p>
+              {isAmountExceedingBalance && maxAvailableAmount > 0 && (
+                <p className="text-xs text-short flex items-center gap-1">
+                  <span>!</span> El monto excede el saldo disponible
+                </p>
+              )}
+              {maxAvailableAmount === 0 && (
+                <p className="text-xs text-neutral">
+                  Conectando con exchange para verificar saldo...
+                </p>
+              )}
+            </div>
           </div>
 
           <div>

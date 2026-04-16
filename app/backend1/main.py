@@ -14,7 +14,7 @@ app = FastAPI(title="BTC Intraday Trading Engine", version="1.0")
 # ==========================
 CAPITAL = 30
 LEVERAGE = 20
-RISK_MAX = 0.5  # 50%
+RISK_MAX = 0.5  # 70%
 
 
 # ==========================

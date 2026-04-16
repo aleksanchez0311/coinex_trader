@@ -233,8 +233,8 @@ class AnalysisEngine:
             )
 
         return {
-            "sl_price": round(sl, 2),
-            "sl_distance": round(sl_distance, 2),
+            "sl_price": round(sl, 4),
+            "sl_distance": round(sl_distance, 4),
             "sl_pct": round((sl_distance / last_price) * 100, 2),
         }
 
@@ -275,14 +275,14 @@ class AnalysisEngine:
         return f"{fecha_hora} ({timezone})"
 
     def _round_levels(self, values: List[float]) -> List[float]:
-        return [round(float(v), 2) for v in values if float(v) > 0]
+        return [round(float(v), 4) for v in values if float(v) > 0]
 
     def _probable_sweep(self, current_price: float, highs: List[float], lows: List[float]):
         upper = min(highs, key=lambda x: abs(x - current_price)) if highs else None
         lower = min(lows, key=lambda x: abs(x - current_price)) if lows else None
         return {
-            "buy_side": round(upper, 2) if upper else None,
-            "sell_side": round(lower, 2) if lower else None,
+            "buy_side": round(upper, 4) if upper else None,
+            "sell_side": round(lower, 4) if lower else None,
         }
 
     def _detect_traps(
@@ -323,18 +323,18 @@ class AnalysisEngine:
         atr: float,
         capital: float,
     ) -> Dict:
-        entry = round(trigger_level, 2)
+        entry = round(trigger_level, 4)
         if direction == "SHORT":
-            stop_loss = round(entry + atr * 0.9, 2)
-            tp1 = round(entry - atr * 1.5, 2)
-            tp2 = round(entry - atr * 2.3, 2)
+            stop_loss = round(entry + atr * 0.9, 4)
+            tp1 = round(entry - atr * 1.5, 4)
+            tp2 = round(entry - atr * 2.3, 4)
             trigger_signal = (
                 f"Barrida por encima de {entry} seguida de rechazo y cierre nuevamente por debajo."
             )
         else:
-            stop_loss = round(entry - atr * 0.9, 2)
-            tp1 = round(entry + atr * 1.5, 2)
-            tp2 = round(entry + atr * 2.3, 2)
+            stop_loss = round(entry - atr * 0.9, 4)
+            tp1 = round(entry + atr * 1.5, 4)
+            tp2 = round(entry + atr * 2.3, 4)
             trigger_signal = (
                 f"Barrida por debajo de {entry} seguida de recuperación y cierre nuevamente por encima."
             )
@@ -450,14 +450,79 @@ class AnalysisEngine:
         ema_50 = indicators.get("ema_50", 0)
         ema_200 = indicators.get("ema_200", 0)
 
+        # EMA bias calculation
         if ema_20 > ema_50 > ema_200:
-            bias = "Alcista"
+            ema_bias = "Alcista"
         elif ema_20 < ema_50 < ema_200:
+            ema_bias = "Bajista"
+        else:
+            ema_bias = "Neutral"
+        
+        # Structure bias calculation
+        structure_bias = "Neutral"
+        if structure_signal.get("bos"):
+            bos_type = structure_signal.get("bos", {}).get("type", "")
+            if "Alcista" in bos_type:
+                structure_bias = "Alcista"
+            elif "Bajista" in bos_type:
+                structure_bias = "Bajista"
+        
+        # Open Interest bias
+        oi_bias = "Neutral"
+        oi_trend = market_context.get("oi_trend", "stable")
+        if oi_trend == "increasing":
+            oi_bias = "Alcista"
+        elif oi_trend == "decreasing":
+            oi_bias = "Bajista"
+        
+        # Final bias decision - weighted logic
+        bias_score = 0
+        bias_reasons = []
+        
+        # EMA weight: 30%
+        if ema_bias == "Alcista":
+            bias_score += 3
+            bias_reasons.append("EMA alcista")
+        elif ema_bias == "Bajista":
+            bias_score -= 3
+            bias_reasons.append("EMA bajista")
+        
+        # Structure weight: 40%
+        if structure_bias == "Alcista":
+            bias_score += 4
+            bias_reasons.append("Estructura alcista")
+        elif structure_bias == "Bajista":
+            bias_score -= 4
+            bias_reasons.append("Estructura bajista")
+        
+        # OI weight: 20%
+        if oi_bias == "Alcista":
+            bias_score += 2
+            bias_reasons.append("OI creciente")
+        elif oi_bias == "Bajista":
+            bias_score -= 2
+            bias_reasons.append("OI decreciente")
+        
+        # Price position weight: 10%
+        price_position = (current_price - support) / (resistance - support)
+        if price_position > 0.7:  # Near resistance
+            bias_score -= 1
+            bias_reasons.append("Precio cerca de resistencia")
+        elif price_position < 0.3:  # Near support
+            bias_score += 1
+            bias_reasons.append("Precio cerca de soporte")
+        
+        # Final bias determination
+        if bias_score >= 3:
+            bias = "Alcista"
+        elif bias_score <= -3:
             bias = "Bajista"
         else:
             bias = "Neutral"
+        
+        print(f">>> Bias calculation: score={bias_score}, reasons={bias_reasons}, final={bias}")
 
-        rsi = float(indicators.get("rsi", 50) or 50)
+        rsi = float(indicators.get("rsi", 70) or 50)
         atr = float(indicators.get("atr", 0) or 0)
         if atr <= 0:
             return {
@@ -530,8 +595,8 @@ class AnalysisEngine:
             "fvgs": fvgs[:3],
             "order_blocks": obs[:3],
             "volume": volume,
-            "last_price": round(current_price, 2),
-            "close_price": round(last_close, 2),
+            "last_price": round(current_price, 4),
+            "close_price": round(last_close, 4),
             "rsi": round(rsi, 2),
             "atr": round(atr, 4),
             "sl_data": sl_data,
@@ -546,9 +611,9 @@ class AnalysisEngine:
             "plan_entrada": trading_plan["plan_entrada"],
             "objetivos_operativos": trading_plan["objetivos"],
             "trampas_mercado": trading_plan["trampas_mercado"],
-            "support": round(support, 2),
-            "resistance": round(resistance, 2),
-            "invalidation": round(invalidation, 2),
+            "support": round(support, 4),
+            "resistance": round(resistance, 4),
+            "invalidation": round(invalidation, 4),
             "derivatives_summary": trading_plan["derivados"],
             "external_context": trading_plan["contexto_externo"],
         }
@@ -606,19 +671,20 @@ class AnalysisEngine:
             liquidation_zones,
         )
 
-        long_entry = round(max(support, current_price - atr * 0.35), 2)
-        short_entry = round(min(resistance, current_price + atr * 0.35), 2)
-        long_sl = round(min(invalidation, long_entry - atr * 1.2), 2)
-        short_sl = round(max(invalidation, short_entry + atr * 1.2), 2)
-        long_risk = abs(long_entry - long_sl)
-        short_risk = abs(short_sl - short_entry)
+        long_entry = round(max(support, current_price - atr * 0.35), 4)
+        short_entry = round(min(resistance, current_price + atr * 0.35), 4)
+        long_sl = round(min(invalidation, long_entry - atr * 1.2), 4)
+        short_sl = round(max(invalidation, short_entry + atr * 1.2), 4)
 
-        long_tp1 = round(long_entry + long_risk * 1.5, 2)
-        long_tp2 = round(long_entry + long_risk * 2.2, 2)
-        long_tp3 = round(long_entry + long_risk * 3.2, 2)
-        short_tp1 = round(short_entry - short_risk * 1.5, 2)
-        short_tp2 = round(short_entry - short_risk * 2.2, 2)
-        short_tp3 = round(short_entry - short_risk * 3.2, 2)
+        long_risk = abs(long_entry - long_sl)
+        short_risk = abs(short_entry - short_sl)
+
+        long_tp1 = round(long_entry + long_risk * 1.5, 4)
+        long_tp2 = round(long_entry + long_risk * 2.2, 4)
+        long_tp3 = round(long_entry + long_risk * 3.2, 4)
+        short_tp1 = round(short_entry - short_risk * 1.5, 4)
+        short_tp2 = round(short_entry - short_risk * 2.2, 4)
+        short_tp3 = round(short_entry - short_risk * 3.2, 4)
 
         decision = "NO TRADE"
         reason = None
@@ -635,7 +701,7 @@ class AnalysisEngine:
 
         if decision == "LONG":
             entry_ideal = long_entry
-            entry_alternativa = round(current_price, 2)
+            entry_alternativa = round(current_price, 4)
             stop_level = long_sl
             take_profits = [
                 {"tp": "TP1", "nivel": long_tp1, "rr": 1.5, "accion": "Reducir 40%", "logica": "Primera toma en liquidez superior cercana."},
@@ -644,7 +710,7 @@ class AnalysisEngine:
             ]
         elif decision == "SHORT":
             entry_ideal = short_entry
-            entry_alternativa = round(current_price, 2)
+            entry_alternativa = round(current_price, 4)
             stop_level = short_sl
             take_profits = [
                 {"tp": "TP1", "nivel": short_tp1, "rr": 1.5, "accion": "Reducir 40%", "logica": "Primera toma en liquidez inferior cercana."},
@@ -654,12 +720,12 @@ class AnalysisEngine:
         else:
             entry_ideal = None
             entry_alternativa = None
-            stop_level = round(invalidation, 2)
+            stop_level = round(invalidation, 4)
             take_profits = []
 
         metrics = self._position_metrics(capital, entry_ideal or current_price, stop_level)
-        supply_zone = [round(max(current_price, resistance - atr * 0.5), 2), round(resistance, 2)]
-        demand_zone = [round(support, 2), round(min(current_price, support + atr * 0.5), 2)]
+        supply_zone = [round(max(current_price, resistance - atr * 0.5), 4), round(resistance, 4)]
+        demand_zone = [round(support, 4), round(min(current_price, support + atr * 0.5), 4)]
         technical_reason = (
             f"Tendencia {bias}, BOS {'confirmado' if structure_signal and structure_signal.get('bos') else 'no confirmado'}, "
             f"liquidez superior {liquidity_highs[:2] or 'N/D'}, liquidez inferior {liquidity_lows[:2] or 'N/D'}."
@@ -700,7 +766,7 @@ class AnalysisEngine:
                 "fecha_hora": fecha_hora,
                 "pais": country or "Cuba",
                 "horizonte": "12-24 horas",
-                "precio_actual": round(current_price, 2),
+                "precio_actual": round(current_price, 4),
                 "apalancamiento_fijo": "20x",
                 "fuentes": "OKX + CoinEx + CoinGecko",
                 "fuente_precio": "OKX ticker",
@@ -716,8 +782,8 @@ class AnalysisEngine:
                 "bos": structure_signal.get("bos"),
                 "mss": structure_signal.get("choch"),
                 "rango": bias == "Neutral",
-                "soporte_principal": round(support, 2),
-                "resistencia_principal": round(resistance, 2),
+                "soporte_principal": round(support, 4),
+                "resistencia_principal": round(resistance, 4),
                 "zona_demanda": demand_zone,
                 "zona_oferta": supply_zone,
                 "atr": round(atr, 2),
@@ -729,9 +795,9 @@ class AnalysisEngine:
                 "zonas_liquidacion": liquidation_zones,
             },
             "niveles_clave": {
-                "soporte": round(support, 2),
-                "resistencia": round(resistance, 2),
-                "invalidation": round(invalidation, 2),
+                "soporte": round(support, 4),
+                "resistencia": round(resistance, 4),
+                "invalidation": round(invalidation, 4),
                 "zonas_liquidez": {"soportes": liquidity_lows, "resistencias": liquidity_highs},
                 "sweep_probable": probable_sweep,
                 "liquidation_zones": liquidation_zones,
@@ -741,7 +807,7 @@ class AnalysisEngine:
                 "entrada_ideal_tipo": "Limit",
                 "entrada_alternativa": entry_alternativa,
                 "entrada_alternativa_tipo": "Market/Confirmacion",
-                "nivel_invalidacion_estructural": round(invalidation, 2),
+                "nivel_invalidacion_estructural": round(invalidation, 4),
             },
             "configuracion_entrada": {
                 "entry_ideal": entry_ideal,
@@ -752,7 +818,7 @@ class AnalysisEngine:
             },
             "stop_loss": {
                 "nivel": stop_level,
-                "logica": f"SL por estructura + volatilidad (ATR {round(atr, 2)}).",
+                "logica": f"SL por estructura + volatilidad (ATR {round(atr, 4)}).",
                 "distancia_pct": f"{round(abs((entry_ideal or current_price) - stop_level) / (entry_ideal or current_price) * 100, 2)}%",
             },
             "take_profits": take_profits,
@@ -773,7 +839,7 @@ class AnalysisEngine:
                 "risk_max_pct": 30,
                 "operation_size_pct": 70,
                 "stop_loss": stop_level,
-                "justificacion_sl": f"Estructura + volatilidad. ATR actual: {round(atr, 2)}.",
+                "justificacion_sl": f"Estructura + volatilidad. ATR actual: {round(atr, 4)}.",
                 "risk_pct_real": metrics["risk_pct_real"],
                 "perdida_monetaria_si_sl": metrics["loss_amount"],
             },

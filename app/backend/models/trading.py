@@ -48,3 +48,12 @@ class ClosePositionRequest(CredentialsRequest):
 
 class TickersBatchRequest(BaseModel):
     symbols: List[str]
+
+
+class TPPositionRequest(BaseModel):
+    market: str
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    amount: Optional[float] = None
+    api_key: str
+    secret: str

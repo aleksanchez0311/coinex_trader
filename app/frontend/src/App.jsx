@@ -13,9 +13,10 @@ import StrategyView from './components/StrategyView';
 import RiskManagementView from './components/RiskManagementView';
 import PositionsTable from './components/PositionsTable';
 import SettingsView from './components/SettingsView';
+import { BalanceProvider, useBalance } from './contexts/BalanceContext';
 import API_URL from './config/api';
 
-const App = () => {
+const AppContent = ({ exchangeBalance, balanceLoading, balanceError, refetchBalance, credentials, setCredentials }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
   const [analysisData, setAnalysisData] = useState(null);
@@ -46,12 +47,6 @@ const App = () => {
   const [entryPrice, setEntryPrice] = useState(null);
   const [riskAmount, setRiskAmount] = useState(7);
   const [currentTradeSide, setCurrentTradeSide] = useState(null);
-  
-  // Gestión de credenciales
-  const [credentials, setCredentials] = useState(() => {
-    const saved = localStorage.getItem('trader_creds');
-    return saved ? JSON.parse(saved) : { apiKey: '', apiSecret: '' };
-  });
 
   const fetchPnlStats = async () => {
     if (!credentials.apiKey || !credentials.apiSecret) {
@@ -266,6 +261,19 @@ const App = () => {
   };
 
   const executeTrade = async () => {
+    console.log(">>> EXECUTE TRADE DEBUG <<<");
+    console.log("entryPrice:", entryPrice);
+    console.log("slPrice:", slPrice);
+    console.log("tpPrice:", tpPrice);
+    console.log("selectedSymbol:", selectedSymbol);
+    console.log("currentTradeSide:", currentTradeSide);
+    console.log("analysisData.analysis.bias:", analysisData?.analysis?.bias);
+    console.log("orderType:", orderType);
+    console.log("leverage:", leverage);
+    console.log("marginMode:", marginMode);
+    console.log("credentials.apiKey:", credentials?.apiKey ? "***" : "undefined");
+    console.log("credentials.apiSecret:", credentials?.apiSecret ? "***" : "undefined");
+    
     if (!entryPrice || !slPrice) {
       alert("Error: Necesitas especificar precio de entrada y stop loss");
       return;
@@ -274,26 +282,35 @@ const App = () => {
 
     try {
       const tokenAmount = await resolvePositionSize();
+      console.log("tokenAmount:", tokenAmount);
+      
+      const requestBody = {
+        symbol: selectedSymbol,
+        side: currentTradeSide || (analysisData.analysis.bias === "Alcista" ? 'buy' : 'sell'),
+        amount: tokenAmount,
+        entry_price: orderType === 'market' ? null : entryPrice,
+        stop_loss: slPrice,
+        take_profit: tpPrice || null,
+        leverage: leverage,
+        margin_mode: marginMode,
+        order_type: orderType,
+        api_key: credentials.apiKey,
+        secret: credentials.apiSecret
+      };
+      
+      console.log(">>> Request body:", requestBody);
+      
       const response = await fetch(`${API_URL}/execute-trade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: selectedSymbol,
-          side: currentTradeSide || (analysisData.analysis.bias === "Alcista" ? 'buy' : 'sell'),
-          amount: tokenAmount,
-          entry_price: orderType === 'market' ? null : entryPrice,
-          stop_loss: slPrice,
-          take_profit: tpPrice || null,
-          leverage: leverage,
-          margin_mode: marginMode,
-          order_type: orderType,
-          api_key: credentials.apiKey,
-          secret: credentials.apiSecret
-        })
+        body: JSON.stringify(requestBody)
       });
       const data = await response.json();
+      console.log(">>> Response data:", data);
       if (response.ok) {
-        alert(`Éxito: Orden ${data.clientOrderId || data.order_id} enviada (${data.side})`);
+        const orderId = data.order?.id || data.order?.clientOrderId || data.clientOrderId || data.order_id || 'N/A';
+        const side = data.order?.side || data.side || 'N/A';
+        alert(`Éxito: Orden ${orderId} enviada (${side})`);
       } else {
         alert(`Error: ${data.detail}`);
       }
@@ -327,6 +344,7 @@ const App = () => {
     setCurrentTradeSide(null);
   }, [selectedSymbol]);
 
+  
   useEffect(() => {
     setRiskAmount(Math.round(capital * 0.7 * 100) / 100);
   }, [capital]);
@@ -349,8 +367,13 @@ const App = () => {
       setSlPrice(analysisData.analysis.bias === "Alcista" ? currentPrice - dist : currentPrice + dist);
     }
     
-    if (analysisData?.position?.tp1) {
-      setTpPrice(analysisData.position.tp1);
+    // El TP debe venir del trading plan o del cálculo de riesgo
+    if (analysisData?.trading_plan?.objetivos?.tp1?.nivel) {
+      setTpPrice(analysisData.trading_plan.objetivos.tp1.nivel);
+    } else if (analysisData?.trading_plan?.escenarios_alternativos?.long?.tp1 && analysisData?.trading_plan?.sesgo_principal === 'LONG') {
+      setTpPrice(analysisData.trading_plan.escenarios_alternativos.long.tp1);
+    } else if (analysisData?.trading_plan?.escenarios_alternativos?.short?.tp1 && analysisData?.trading_plan?.sesgo_principal === 'SHORT') {
+      setTpPrice(analysisData.trading_plan.escenarios_alternativos.short.tp1);
     }
   }, [analysisData]);
 
@@ -371,24 +394,20 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab}
-        selected={selectedSymbol}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+    <div className="min-h-screen bg-background text-textPrimary flex">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} selected={selectedSymbol} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <main className="flex-1 flex flex-col min-w-0">
         <Header 
           pnlStats={pnlStats} 
           pnlLoading={pnlLoading} 
+          exchangeBalance={exchangeBalance}
+          balanceLoading={balanceLoading}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           sidebarOpen={sidebarOpen}
           onCloseSidebar={() => setSidebarOpen(false)}
         />
-        
+      
         <div className="flex-1 overflow-y-auto p-3 md:p-6">
           {activeTab === 'dashboard' && (
             <div className="space-y-4 md:space-y-6">
@@ -443,9 +462,6 @@ const App = () => {
             </div>
           )}
 
-          {activeTab === 'strategy' && <StrategyView />}
-          {activeTab === 'risk' && <RiskManagementView />}
-          
           {activeTab === 'positions' && (
             <div className="w-full">
               <PositionsTable 
@@ -453,7 +469,8 @@ const App = () => {
               />
             </div>
           )}
-
+          {activeTab === 'strategy' && <StrategyView />}
+          {activeTab === 'risk' && <RiskManagementView />}
           {activeTab === 'settings' && (
             <div className="w-full">
               <SettingsView 
@@ -464,48 +481,76 @@ const App = () => {
             </div>
           )}
         </div>
+
+        {/* Modales */}
+        <PlanOperativoModal 
+          isOpen={showPlanModal}
+          onClose={() => { setShowPlanModal(false); setCurrentTradingPlan(null); }}
+          tradingPlan={currentTradingPlan}
+          symbol={selectedSymbol}
+          onOpenTrade={handleOpenTrade}
+        />
+
+        <InfoAvanzadaModal 
+          isOpen={showAdvancedModal}
+          onClose={() => setShowAdvancedModal(false)}
+          analysisData={analysisData}
+          symbol={selectedSymbol}
+        />
+
+        <ConfirmOrderModal 
+          isOpen={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          selectedSymbol={selectedSymbol}
+          orderType={orderType}
+          setOrderType={setOrderType}
+          marginMode={marginMode}
+          setMarginMode={setMarginMode}
+          leverage={leverage}
+          setLeverage={setLeverage}
+          entryPrice={entryPrice}
+          setEntryPrice={setEntryPrice}
+          slPrice={slPrice}
+          setSlPrice={setSlPrice}
+          tpPrice={tpPrice}
+          setTpPrice={setTpPrice}
+          riskAmount={riskAmount}
+          setRiskAmount={setRiskAmount}
+          currentTradeSide={currentTradeSide}
+          executing={executing}
+          onConfirm={executeTrade}
+          tradingPlan={currentTradingPlan}
+          exchangeBalance={exchangeBalance}
+        />
       </main>
-
-      {/* Modales */}
-      <PlanOperativoModal 
-        isOpen={showPlanModal}
-        onClose={() => { setShowPlanModal(false); setCurrentTradingPlan(null); }}
-        tradingPlan={currentTradingPlan}
-        symbol={selectedSymbol}
-        onOpenTrade={handleOpenTrade}
-      />
-
-      <InfoAvanzadaModal 
-        isOpen={showAdvancedModal}
-        onClose={() => setShowAdvancedModal(false)}
-        analysisData={analysisData}
-        symbol={selectedSymbol}
-      />
-
-      <ConfirmOrderModal 
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        selectedSymbol={selectedSymbol}
-        orderType={orderType}
-        setOrderType={setOrderType}
-        marginMode={marginMode}
-        setMarginMode={setMarginMode}
-        leverage={leverage}
-        setLeverage={setLeverage}
-        entryPrice={entryPrice}
-        setEntryPrice={setEntryPrice}
-        slPrice={slPrice}
-        setSlPrice={setSlPrice}
-        tpPrice={tpPrice}
-        setTpPrice={setTpPrice}
-        riskAmount={riskAmount}
-        setRiskAmount={setRiskAmount}
-        currentTradeSide={currentTradeSide}
-        executing={executing}
-        onConfirm={executeTrade}
-        tradingPlan={analysisData?.analysis?.trading_plan}
-      />
     </div>
+  );
+};
+
+const AppWithBalance = ({ credentials, setCredentials }) => {
+  const { exchangeBalance, balanceLoading, balanceError, refetchBalance } = useBalance();
+  
+  return <AppContent 
+    exchangeBalance={exchangeBalance}
+    balanceLoading={balanceLoading}
+    balanceError={balanceError}
+    refetchBalance={refetchBalance}
+    credentials={credentials}
+    setCredentials={setCredentials}
+  />;
+};
+
+const App = () => {
+  // Gestión de credenciales - nivel superior
+  const [credentials, setCredentials] = useState(() => {
+    const saved = localStorage.getItem('trader_creds');
+    return saved ? JSON.parse(saved) : { apiKey: '', apiSecret: '' };
+  });
+  
+  return (
+    <BalanceProvider credentials={credentials}>
+      <AppWithBalance credentials={credentials} setCredentials={setCredentials} />
+    </BalanceProvider>
   );
 };
 

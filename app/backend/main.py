@@ -16,6 +16,7 @@ from models.trading import (
     CredentialsRequest,
     ClosePositionRequest,
     TickersBatchRequest,
+    TPPositionRequest,
 )
 
 from fastapi.exceptions import RequestValidationError
@@ -185,6 +186,35 @@ async def calculate_risk(req: RiskRequest):
 
 @app.post("/execute-trade")
 async def execute_trade(req: TradeExecutionRequest):
+    """Ejecuta una orden de trading con TP y SL"""
+    print(f"=== EXECUTE TRADE REQUEST ===")
+    print(f"Symbol: {req.symbol}")
+    print(f"Side: {req.side}")
+    print(f"Amount: {req.amount}")
+    print(f"Entry Price: {req.entry_price}")
+    print(f"Stop Loss: {req.stop_loss}")
+    print(f"Take Profit: {req.take_profit}")
+    print(f"Leverage: {req.leverage}")
+    print(f"Margin Mode: {req.margin_mode}")
+    print(f"Order Type: {req.order_type}")
+    print(f"API Key: {req.api_key[:10]}..." if req.api_key else "None")
+    print(f"Secret: {'***' if req.secret else 'None'}")
+    print(f"============================")
+
+    # Validar que los valores no sean None o 0
+    if not req.symbol:
+        print("ERROR: Symbol is None or empty")
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    if not req.side:
+        print("ERROR: Side is None or empty")
+        raise HTTPException(status_code=400, detail="Side is required")
+    if not req.amount or req.amount <= 0:
+        print(f"ERROR: Invalid amount: {req.amount}")
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    if not req.stop_loss or req.stop_loss <= 0:
+        print(f"ERROR: Invalid stop_loss: {req.stop_loss}")
+        raise HTTPException(status_code=400, detail="Stop loss must be greater than 0")
+
     client = TradingClient(api_key=req.api_key, secret=req.secret)
 
     result = client.create_order_with_sl_tp(
@@ -198,6 +228,9 @@ async def execute_trade(req: TradeExecutionRequest):
         margin_mode=req.margin_mode,
         order_type=req.order_type,
     )
+
+    print(f"RESULT: {result}")
+    print(f"========================")
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -243,7 +276,7 @@ async def close_position(req: ClosePositionRequest):
 
 @app.post("/pnl-stats")
 async def get_pnl_stats(req: CredentialsRequest):
-    """Obtiene estadísticas de PnL realizado"""
+    """Obtiene estadísticas de PnL de CoinEx"""
     client = TradingClient(api_key=req.api_key, secret=req.secret)
     stats = client.get_realized_pnl()
 
@@ -251,6 +284,81 @@ async def get_pnl_stats(req: CredentialsRequest):
         raise HTTPException(status_code=400, detail=stats["error"])
 
     return stats
+
+@app.post("/check-position")
+async def check_position(req: CredentialsRequest, market: str):
+    """Verifica si existe posición activa para un market"""
+    print(f"=== CHECK POSITION REQUEST ===")
+    print(f"Market: {market}")
+    print(f"API Key: {req.api_key[:10]}..." if req.api_key else "None")
+    print(f"========================")
+
+    if not market:
+        raise HTTPException(status_code=400, detail="Market is required")
+
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    
+    # Verificar si existe posición activa
+    position_check = client.check_position_exists(market)
+    
+    print(f">>> Position check result: {position_check}")
+    
+    return position_check
+
+@app.post("/set-position-tp-sl")
+async def set_position_tp_sl(req: TPPositionRequest):
+    """Establece TP/SL en posición activa de CoinEx"""
+    print(f"=== SET POSITION TP/SL REQUEST ===")
+    print(f"Market: {req.market}")
+    print(f"Stop Loss: {req.stop_loss}")
+    print(f"Take Profit: {req.take_profit}")
+    print(f"Amount: {req.amount}")
+    print(f"API Key: {req.api_key[:10]}..." if req.api_key else "None")
+    print(f"==============================")
+
+    # Validar que los valores no sean None o 0
+    if not req.market:
+        print("ERROR: Market is None or empty")
+        raise HTTPException(status_code=400, detail="Market is required")
+    if not req.stop_loss and not req.take_profit:
+        print("ERROR: No stop_loss or take_profit provided")
+        raise HTTPException(status_code=400, detail="At least stop_loss or take_profit is required")
+
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    
+    # Establecer TP/SL usando los métodos específicos de CoinEx
+    results = client.set_position_tp_sl_after_order(
+        market=req.market,
+        stop_loss=req.stop_loss,
+        take_profit=req.take_profit,
+        amount=req.amount
+    )
+    
+    print(f">>> TP/SL Results: {results}")
+    
+    if results.get("errors") and len(results["errors"]) > 0:
+        print(f"ERRORS: {results['errors']}")
+        raise HTTPException(status_code=400, detail={"errors": results["errors"]})
+    
+    return {
+        "success": True,
+        "stop_loss": results["stop_loss"],
+        "take_profit": results["take_profit"],
+        "position_check": results.get("position_check"),
+        "message": "TP/SL establecidos correctamente"
+    }
+
+
+@app.post("/balance")
+async def get_balance(req: CredentialsRequest):
+    """Obtiene balance de la cuenta de CoinEx"""
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    balance = client.get_balance()
+
+    if isinstance(balance, dict) and "error" in balance:
+        raise HTTPException(status_code=400, detail=balance["error"])
+
+    return balance
 
 
 @app.get("/markets")

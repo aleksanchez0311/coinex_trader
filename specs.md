@@ -146,6 +146,10 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 - python-dotenv
 - requests (para APIs externas)
 - concurrent.futures (threading para análisis paralelo)
+- scipy (cálculos avanzados)
+- aiodns (DNS asíncrono)
+- aiohttp (HTTP asíncrono)
+- yarl (URL parsing)
 
 ### Frontend
 - react
@@ -157,12 +161,27 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 - lightweight-charts
 - clsx
 - tailwind-merge
+- @capacitor/android (Capacitor 7)
+- @capacitor/cli (CLI Capacitor)
+- @capacitor/core (Core Capacitor)
+- @capacitor/ios (iOS support)
+- html5-qrcode (QR scanner)
+- autoprefixer (CSS prefixes)
+- postcss (CSS processing)
 
 ### Launcher (Windows)
 - exeify.bat (build script)
 - iconify.bat (icon generator)
 - exeify.cs (C# source)
 - .NET Framework 4.x (build runtime)
+
+### APK Build (Android)
+- apkify.bat (build script)
+- add_camera.ps1 (camera permissions)
+- Java 22+ (compilation)
+- Android SDK 35+ (target)
+- Gradle 8.10.2+ (build system)
+- Capacitor 7 (hybrid framework)
 
 ## 🖥️ Launcher Windows
 
@@ -182,82 +201,6 @@ Genera `CoinExTrader.exe` + `favicon.ico`
 6. Minimiza a System Tray
 7. Click derecho → "Recargar Proyecto" (git pull + reinstall)
 
-## 🔄 Actualizaciones
-
-Todas las actualizaciones de datos se ejecutan cuando la app gana foco (visibilitychange event):
-- PnL stats
-- Análisis de mercado
-- Precios de favoritos
-- Posiciones abiertas
-- Balance
-
-## ⚠️ Limitaciones
-
-- Modo Paper no implementado (todo es LIVE)
-- Solo futuros perpetuos CoinEx
-- Sin soporte para órdenes OCO
-- Sin trailing stop
-- Solo Windows (.exe launcher)
-- CORS permitido para cualquier origen (desarrollo)
-
-## 🧠 Metodología de Análisis
-
-### SMC (Smart Money Concepts)
-- **Swings**: Detección de HH, HL, LH, LL
-- **BOS/CHOCH**: Break of Structure, Change of Character
-- **Liquidez**: Equal highs, equal lows, stop clusters
-- **FVG**: Fair Value Gaps (brechas de valor razonable)
-- **OB**: Order Blocks (bloques de órdenes institucionales)
-
-### Indicadores Técnicos
-- **EMA 20/50/200**: Dirección de tendencia (EMA stack)
-- **RSI (14)**: Timing de entrada (zona 40-60)
-- **ATR (14)**: Stop Loss basado en volatilidad (1.5x ATR)
-
-### Pre-Trade Checklist (6 puntos)
-1. ✓ Tendencia EMA alineada (EMA20 > EMA50 > EMA200 para LONG)
-2. ✓ Estructura BOS confirmada
-3. ✓ Zonas de liquidez identificadas
-4. ✓ OB/FVG válido detectado
-5. ✓ RSI en zona correcta (40-60)
-6. ✓ Volumen confirmado
-
-**Si pasan < 5 → NO OPERAR**
-
-### Scoring
-- **ALTA PROBABILIDAD**: score ≥ 70 AND checks ≥ 5
-- **MEDIA PROBABILIDAD**: score ≥ 50 AND checks ≥ 4
-- **BAJA PROBABILIDAD**: score < 50
-
-## ð¦ Android APK (Capacitor)
-
-### Arquitectura Android
-```
-WebView (React App)
-â Capacitor Bridge
-â Native Android APIs
-â System Services
-```
-
-### Componentes Android
-- **Capacitor Core**: Bridge entre JavaScript y nativo
-- **Android WebView**: Renderizado de la app React
-- **Notifications API**: Alertas push de trading
-- **Storage API**: Persistencia local de datos
-- **App API**: Control de ciclo de vida
-
-### Configuración
-- **Package ID**: `cu.limitlesscode.coinextraderandroid`
-- **Target SDK**: API Level 34+
-- **Min SDK**: API Level 24+
-- **Java Version**: 22+ (Eclipse Adoptium)
-
-### Build Process
-1. `npm run build` - Build frontend
-2. `npx cap sync` - Sincronizar con Android
-3. `gradlew assembleRelease` - Compilar APK
-4. `apkify.bat` - Script automatizado
-
 ## ðª Componentes UI Detallados
 
 ### Componentes Principales
@@ -271,6 +214,7 @@ WebView (React App)
 - **Sidebar.jsx**: Navegación colapsable (oculta por defecto)
 - **ActionButtons.jsx**: Botones Plan Operativo e Info Avanzada
 - **StrategyView.jsx**: Display estrategia y parámetros técnicos
+- **RiskManagementView.jsx**: Vista completa de gestión de riesgo
 
 ### Componentes Modales
 - **PlanOperativoModal.jsx**: Modal glassmorphism con plan trading completo
@@ -326,6 +270,15 @@ WebView (React App)
 - **Multiplataforma**: Launcher solo Windows, APK solo Android
 - **CORS**: Permitido para cualquier origen (desarrollo)
 - **Offline**: Funcionalidad limitada sin conexión
+- **iOS**: No disponible (solo Android)
+- **Linux/macOS**: Launcher solo Windows
+
+### Mejoras Implementadas
+- **Capacitor 7**: Actualización a última versión
+- **QR Scanner**: Integración html5-qrcode para API keys
+- **Android SDK 35**: Soporte para Android 14+
+- **Java 22**: Compilación con JDK más reciente
+- **Build Tools 35.0.0**: Herramientas de build actualizadas
 
 ### Mejoras Planeadas
 - **Paper Trading**: Modo simulación
@@ -334,3 +287,4 @@ WebView (React App)
 - **iOS App**: Capacitor iOS
 - **Desktop App**: Electron cross-platform
 - **WebSocket**: Streaming tiempo real
+- **Edge Functions**: Funciones serverless (edge-function/)

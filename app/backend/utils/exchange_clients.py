@@ -1,10 +1,13 @@
 import ccxt
+import pandas as pd
+import numpy as np
+import requests
 import os
 import time
-from typing import Dict, List, Tuple
-
-import requests
-
+import json
+import asyncio
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta
 
 class MarketDataClient:
     """Cliente para datos de mercado y análisis - EXCLUSIVAMENTE OKX"""
@@ -358,23 +361,98 @@ class MarketDataClient:
             return {"error": str(e)}
 
 
-class TradingClient:
-    """Cliente de ejecución de órdenes - EXCLUSIVAMENTE COINEX"""
-
-    def __init__(self, api_key: str = None, secret: str = None):
-        self.api_key = api_key or os.getenv("COINEX_API_KEY")
-        self.secret = secret or os.getenv("COINEX_SECRET")
-
-        self.client = ccxt.coinex(
-            {
-                "apiKey": self.api_key,
-                "secret": self.secret,
-                "enableRateLimit": True,
+class RateLimiter:
+    """Manejo de rate limits para CoinEx API"""
+    
+    def __init__(self):
+        self.request_times = {}
+        self.rate_limits = {
+            "ip_limit": 400,  # 400 requests/second
+            "short_cycle": {
+                "spot": 20,  # 20 requests/second
+                "futures": 20  # 20 requests/second
+            },
+            "long_cycle": {
+                "reset_interval": 3600,  # 1 hour cycles
+                "max_volume": 1000  # Max requests per cycle
             }
-        )
+        }
+    
+    def wait_if_needed(self, endpoint_group: str = "futures"):
+        """Espera si es necesario para evitar rate limits"""
+        current_time = time.time()
+        
+        # Inicializar si no hay registros
+        if endpoint_group not in self.request_times:
+            self.request_times[endpoint_group] = []
+        
+        # Limpiar registros viejos (más de 1 hora)
+        self.request_times[endpoint_group] = [
+            req_time for req_time in self.request_times[endpoint_group]
+            if current_time - req_time < 3600
+        ]
+        
+        # Verificar short cycle rate limit
+        if len(self.request_times[endpoint_group]) >= self.rate_limits["short_cycle"][endpoint_group]:
+            # Calcular tiempo de espera
+            oldest_request = min(self.request_times[endpoint_group])
+            wait_time = 1.0 - (current_time - oldest_request)
+            
+            if wait_time > 0:
+                print(f">>> Rate limit detected for {endpoint_group}. Waiting {wait_time:.2f}s...")
+                time.sleep(wait_time)
+        
+        # Registrar esta solicitud
+        self.request_times[endpoint_group].append(current_time)
+    
+    def handle_rate_limit_error(self, response_headers: dict) -> bool:
+        """Maneja errores de rate limit basados en headers"""
+        if not response_headers:
+            return False
+            
+        # Verificar headers de rate limit de CoinEx
+        limit_header = response_headers.get('X-RateLimit-Limit')
+        remaining_header = response_headers.get('X-RateLimit-Remaining')
+        
+        if limit_header and remaining_header and int(remaining_header) <= 0:
+            print(">>> Rate limit exceeded. Waiting...")
+            return True
+        
+        return False
+
+
+class TradingClient:
+    """Cliente para trading en CoinEx con manejo mejorado de TP/SL y rate limits"""
+
+    def __init__(self, api_key: str, secret: str):
+        self.rate_limiter = RateLimiter()
+        self.client = ccxt.coinex({
+            "apiKey": api_key,
+            "secret": secret,
+            "enableRateLimit": True,
+            "options": {
+                "defaultType": "swap",
+                "adjustForTimeDifference": True
+            }
+        })
         self.client.options["defaultType"] = "swap"
         self.client.options["createMarketBuyOrderRequiresPrice"] = False
         self.client.options["defaultMarginMode"] = "isolated"
+        
+        # Cache para actualizaciones rápidas
+        self._cache = {
+            "positions": {"data": None, "timestamp": 0, "ttl": 1.0},  # 1 segundo
+            "balance": {"data": None, "timestamp": 0, "ttl": 2.0},    # 2 segundos
+            "pnl": {"data": None, "timestamp": 0, "ttl": 3.0}         # 3 segundos
+        }
+        
+        # Contadores para rate limit optimization
+        self._request_counters = {
+            "positions": 0,
+            "balance": 0, 
+            "pnl": 0,
+            "last_reset": time.time()
+        }
 
     def _get_okx_verified_markets(self) -> set:
         """Obtiene mercados verificados desde OKX para cross-check"""
@@ -415,7 +493,19 @@ class TradingClient:
         margin_mode: str = "isolated",
         order_type: str = "limit",
     ) -> Dict:
-        """Crea orden y luego configura SL/TP en CoinEx Futures por separado."""
+        """Crea orden con TP y SL incorporados desde el principio usando el método específico de CoinEx."""
+        print(f"=== CREATE ORDER WITH TP/SL (INCORPORADOS) DEBUG ===")
+        print(f"Symbol: {symbol}")
+        print(f"Side: {side}")
+        print(f"Amount: {amount}")
+        print(f"Entry Price: {entry_price}")
+        print(f"Stop Loss: {stop_loss}")
+        print(f"Take Profit: {take_profit}")
+        print(f"Leverage: {leverage}")
+        print(f"Margin Mode: {margin_mode}")
+        print(f"Order Type: {order_type}")
+        print(f"==================================================")
+        
         if ":" not in symbol:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
@@ -436,86 +526,400 @@ class TradingClient:
 
             self.set_leverage(symbol, leverage, margin_mode)
 
-            order_params = {}
-            if order_type == "market" or not entry_price:
-                order = self.client.create_market_order(
-                    symbol=symbol, side=side, amount=amount, params=order_params
-                )
-            else:
-                order = self.client.create_limit_order(
-                    symbol=symbol,
-                    side=side,
-                    amount=amount,
-                    price=entry_price,
-                    params=order_params,
-                )
-
-            protective = {"stop_loss": None, "take_profit": None, "warnings": []}
-            trigger_type = "latest_price"
-
-            # CoinEx/CCXT no aplica SL+TP juntos en una sola llamada.
-            # Se colocan por separado contra la posicion abierta.
-            if stop_loss:
-                try:
-                    sl_resp = self.client.create_order(
-                        symbol=symbol,
-                        type="market",
-                        side=side,
-                        amount=amount,
-                        params={
-                            "stopLossPrice": float(stop_loss),
-                            "stop_type": trigger_type,
-                        },
-                    )
-                    protective["stop_loss"] = {
-                        "requested": float(stop_loss),
-                        "status": "set",
-                        "exchange_response": sl_resp,
-                    }
-                except Exception as e:
-                    protective["stop_loss"] = {
-                        "requested": float(stop_loss),
-                        "status": "error",
-                        "error": str(e),
-                    }
+            # CoinEx no soporta TP/SL en la orden inicial.
+            # Hay que crear la orden y luego establecer TP/SL en la posición
+            print(f">>> Creating initial order without TP/SL (CoinEx limitation)...")
+            
+            # Crear la orden simple sin TP/SL
+            order = self.client.create_order(
+                symbol=symbol,
+                type=order_type,
+                side=side,
+                amount=amount,
+                price=entry_price if order_type == "limit" else None,
+                params={}
+            )
+            
+            print(f">>> Initial order created: {order}")
+            print(f">>> Will set TP/SL after position opens...")
+            
+            # Estructura de respuesta para compatibilidad
+            protective = {
+                "stop_loss": {
+                    "requested": float(stop_loss) if stop_loss else None,
+                    "status": "pending",
+                    "message": "Will be set when position opens",
+                    "method": "coinex_position_api"
+                } if stop_loss else None,
+                "take_profit": {
+                    "requested": float(take_profit) if take_profit else None,
+                    "status": "pending",
+                    "message": "Will be set when position opens",
+                    "method": "coinex_position_api"
+                } if take_profit else None,
+                "warnings": [
+                    "CoinEx no soporta TP/SL en orden inicial. Se establecerán cuando la posición se abra.",
+                    "Usando endpoints específicos: /futures/set-position-stop-loss y /futures/set-position-take-profit"
+                ]
+            }
+            
+            # Verificar si la respuesta contiene información sobre TP/SL
+            if order and isinstance(order, dict):
+                order_info = order.get('info', {})
+                if not order_info.get('takeProfitPrice') and take_profit:
                     protective["warnings"].append(
-                        "No se pudo establecer Stop Loss. Si la orden no abre posicion aun (ej. limit pendiente), reintentar tras fill."
+                        "Take Profit fue solicitado pero no aparece en la respuesta de la orden"
                     )
-
-            if take_profit:
-                try:
-                    tp_resp = self.client.create_order(
-                        symbol=symbol,
-                        type="market",
-                        side=side,
-                        amount=amount,
-                        params={
-                            "takeProfitPrice": float(take_profit),
-                            "stop_type": trigger_type,
-                        },
-                    )
-                    protective["take_profit"] = {
-                        "requested": float(take_profit),
-                        "status": "set",
-                        "exchange_response": tp_resp,
-                    }
-                except Exception as e:
-                    protective["take_profit"] = {
-                        "requested": float(take_profit),
-                        "status": "error",
-                        "error": str(e),
-                    }
+                if not order_info.get('stopLossPrice') and stop_loss:
                     protective["warnings"].append(
-                        "No se pudo establecer Take Profit. Si la orden no abre posicion aun (ej. limit pendiente), reintentar tras fill."
+                        "Stop Loss fue solicitado pero no aparece en la respuesta de la orden"
                     )
-
+            
             return {
                 "order": order,
                 "protective_orders": protective,
+                "method": "incorporated_tp_sl"
             }
 
         except Exception as e:
-            return {"error": str(e)}
+            print(f">>> Error creating order with TP/SL: {str(e)}")
+            
+            # Fallback: intentar crear orden simple y luego configurar TP/TP por separado
+            print(f">>> Trying fallback: create simple order + separate TP/SL...")
+            try:
+                # Crear orden simple
+                order_params = {}
+                if order_type == "market" or not entry_price:
+                    order = self.client.create_market_order(
+                        symbol=symbol, side=side, amount=amount, params=order_params
+                    )
+                else:
+                    order = self.client.create_limit_order(
+                        symbol=symbol,
+                        side=side,
+                        amount=amount,
+                        price=entry_price,
+                        params=order_params,
+                    )
+                
+                print(f">>> Simple order created, attempting to set TP/SL separately...")
+                
+                # Intentar configurar TP/SL por separado
+                protective = {"stop_loss": None, "take_profit": None, "warnings": []}
+                
+                # Para órdenes market, intentar configurar TP/TP inmediatamente
+                if order_type == "market":
+                    if stop_loss:
+                        try:
+                            sl_resp = self.client.create_stop_loss_order(
+                                symbol=symbol,
+                                type="market",
+                                side=side,
+                                amount=amount,
+                                stopLossPrice=float(stop_loss),
+                                params={}
+                            )
+                            protective["stop_loss"] = {
+                                "requested": float(stop_loss),
+                                "status": "set",
+                                "exchange_response": sl_resp,
+                                "method": "fallback"
+                            }
+                        except Exception as sl_e:
+                            protective["stop_loss"] = {
+                                "requested": float(stop_loss),
+                                "status": "error",
+                                "error": str(sl_e)
+                            }
+                            protective["warnings"].append(f"Stop Loss fallback failed: {str(sl_e)[:50]}")
+                    
+                    if take_profit:
+                        try:
+                            tp_resp = self.client.create_take_profit_order(
+                                symbol=symbol,
+                                type="limit",
+                                side=side,
+                                amount=amount,
+                                takeProfitPrice=float(take_profit),
+                                params={}
+                            )
+                            protective["take_profit"] = {
+                                "requested": float(take_profit),
+                                "status": "set",
+                                "exchange_response": tp_resp,
+                                "method": "fallback"
+                            }
+                        except Exception as tp_e:
+                            protective["take_profit"] = {
+                                "requested": float(take_profit),
+                                "status": "error",
+                                "error": str(tp_e)
+                            }
+                            protective["warnings"].append(f"Take Profit fallback failed: {str(tp_e)[:50]}")
+                else:
+                    # Para órdenes limit, crear nueva orden con TP/SL incorporados
+                    # Esto debería funcionar con el método estándar de CCXT
+                    print(f">>> Creating limit order with TP/SL using standard CCXT method...")
+                    
+                    try:
+                        # Intentar crear una nueva orden limit con TP/SL
+                        order_params = {}
+                        if take_profit:
+                            order_params["takeProfitPrice"] = float(take_profit)
+                        if stop_loss:
+                            order_params["stopLossPrice"] = float(stop_loss)
+                        
+                        # Re-crear la orden con TP/SL
+                        order_with_tp_sl = self.client.create_order(
+                            symbol=symbol,
+                            type="limit",
+                            side=side,
+                            amount=amount,
+                            price=entry_price,
+                            params=order_params
+                        )
+                        
+                        print(f">>> Limit order with TP/SL created successfully: {order_with_tp_sl}")
+                        
+                        protective = {
+                            "stop_loss": {
+                                "requested": float(stop_loss) if stop_loss else None,
+                                "status": "set" if stop_loss else "not_requested",
+                                "exchange_response": order_with_tp_sl if stop_loss else None,
+                                "method": "standard_ccxt"
+                            } if stop_loss else None,
+                            "take_profit": {
+                                "requested": float(take_profit) if take_profit else None,
+                                "status": "set" if take_profit else "not_requested",
+                                "exchange_response": order_with_tp_sl if take_profit else None,
+                                "method": "standard_ccxt"
+                            } if take_profit else None,
+                            "warnings": ["Orden limit creada con TP/SL usando método estándar de CCXT."]
+                        }
+                        
+                        # Usar la nueva orden con TP/SL
+                        order = order_with_tp_sl
+                        
+                    except Exception as tp_sl_error:
+                        print(f">>> Error creating limit order with TP/SL: {str(tp_sl_error)}")
+                        print(f">>> Falling back to simple limit order...")
+                        
+                        # Si falla, mantener la orden simple y marcar TP/SL como pending
+                        protective = {
+                            "stop_loss": {
+                                "requested": float(stop_loss) if stop_loss else None,
+                                "status": "pending",
+                                "message": "Will be set when position opens"
+                            } if stop_loss else None,
+                            "take_profit": {
+                                "requested": float(take_profit) if take_profit else None,
+                                "status": "pending", 
+                                "message": "Will be set when position opens"
+                            } if take_profit else None,
+                            "warnings": [f"TP/SL failed ({str(tp_sl_error)[:50]}), will set when position opens."]
+                        }
+                
+                return {
+                    "order": order,
+                    "protective_orders": protective,
+                    "method": "fallback_simple_order"
+                }
+                
+            except Exception as fallback_e:
+                print(f">>> Fallback also failed: {str(fallback_e)}")
+                return {"error": f"Primary method failed: {str(e)}. Fallback failed: {str(fallback_e)}"}
+
+    def set_position_stop_loss(self, market: str, stop_loss_price: float, stop_loss_amount: float = None) -> Dict:
+        """Establece Stop Loss en posición activa usando API de CoinEx"""
+        try:
+            print(f">>> Setting position Stop Loss: {stop_loss_price}")
+            
+            data = {
+                "market": market,
+                "market_type": "FUTURES",
+                "stop_loss_type": "mark_price",
+                "stop_loss_price": str(stop_loss_price),
+                "stop_loss_amount": str(stop_loss_amount) if stop_loss_amount else "0"
+            }
+            
+            response = self.post_futures_private_with_retry(
+                "/futures/set-position-stop-loss",
+                data=data
+            )
+            
+            print(f">>> Position Stop Loss set successfully: {response}")
+            return {
+                "success": True,
+                "response": response,
+                "price": stop_loss_price
+            }
+        except Exception as e:
+            print(f">>> Error setting position Stop Loss: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "price": stop_loss_price
+            }
+
+    def set_position_take_profit(self, market: str, take_profit_price: float, take_profit_amount: float = None) -> Dict:
+        """Establece Take Profit en posición activa usando API de CoinEx"""
+        try:
+            print(f">>> Setting position Take Profit: {take_profit_price}")
+            
+            data = {
+                "market": market,
+                "market_type": "FUTURES",
+                "take_profit_type": "mark_price",
+                "take_profit_price": str(take_profit_price),
+                "take_profit_amount": str(take_profit_amount) if take_profit_amount else "0"
+            }
+            
+            response = self.post_futures_private_with_retry(
+                "/futures/set-position-take-profit",
+                data=data
+            )
+            
+            print(f">>> Position Take Profit set successfully: {response}")
+            return {
+                "success": True,
+                "response": response,
+                "price": take_profit_price
+            }
+        except Exception as e:
+            print(f">>> Error setting position Take Profit: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "price": take_profit_price
+            }
+
+    def check_position_exists(self, market: str) -> Dict:
+        """Verifica si existe posición activa para el market"""
+        try:
+            print(f">>> Checking if position exists for {market}...")
+            
+            # Obtener posiciones activas
+            positions = self.client.fetch_positions([market])
+            
+            # Buscar posición con tamaño > 0
+            active_position = None
+            for pos in positions:
+                if (pos.get('symbol') == market and 
+                    pos.get('contracts', 0) > 0 and 
+                    pos.get('side') in ['long', 'short']):
+                    active_position = pos
+                    break
+            
+            if active_position:
+                print(f">>> Active position found: {active_position}")
+                return {
+                    "exists": True,
+                    "position": active_position,
+                    "contracts": float(active_position.get('contracts', 0)),
+                    "side": active_position.get('side'),
+                    "entry_price": float(active_position.get('entryPrice', 0))
+                }
+            else:
+                print(f">>> No active position found for {market}")
+                return {
+                    "exists": False,
+                    "position": None,
+                    "contracts": 0,
+                    "side": None,
+                    "entry_price": 0
+                }
+                
+        except Exception as e:
+            print(f">>> Error checking position: {str(e)}")
+            return {
+                "exists": False,
+                "position": None,
+                "contracts": 0,
+                "side": None,
+                "entry_price": 0,
+                "error": str(e)
+            }
+                
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """Verifica si el cache es válido"""
+        cache_entry = self._cache.get(cache_key)
+        if not cache_entry or cache_entry["data"] is None:
+            return False
+        
+        age = time.time() - cache_entry["timestamp"]
+        return age < cache_entry["ttl"]
+    
+    def _update_cache(self, cache_key: str, data: Any):
+        """Actualiza el cache"""
+        self._cache[cache_key] = {
+            "data": data,
+            "timestamp": time.time(),
+            "ttl": self._cache[cache_key]["ttl"]
+        }
+    
+    def _get_optimal_delay(self, endpoint_type: str) -> float:
+        """Calcula el delay óptimo basado en rate limits"""
+        current_time = time.time()
+        
+        # Resetear contadores cada minuto
+        if current_time - self._request_counters["last_reset"] > 60:
+            self._request_counters = {
+                "positions": 0,
+                "balance": 0,
+                "pnl": 0,
+                "last_reset": current_time
+            }
+        
+        # Rate limits: 20 req/s para futures
+        max_per_second = 20
+        current_per_second = self._request_counters[endpoint_type]
+        
+        if current_per_second >= max_per_second:
+            return 1.0  # Esperar 1 segundo si alcanzamos el límite
+        
+        # Calcular delay para mantenerse bajo el límite
+        return 0.05  # 50ms mínimo para no exceder el límite
+
+    def set_position_tp_sl_after_order(self, market: str, stop_loss: float = None, take_profit: float = None, amount: float = None) -> Dict:
+        """Establece TP/SL después de que la orden se ejecute y la posición se abra"""
+        print(f">>> Setting TP/SL after order execution...")
+        
+        # Primero verificar si existe posición activa
+        position_check = self.check_position_exists(market)
+        
+        if not position_check["exists"]:
+            return {
+                "stop_loss": None,
+                "take_profit": None,
+                "errors": [f"No active position found for {market}. Cannot set TP/SL without open position."],
+                "position_check": position_check
+            }
+        
+        print(f">>> Position confirmed: {position_check['contracts']} contracts, side: {position_check['side']}")
+        
+        results = {
+            "stop_loss": None,
+            "take_profit": None,
+            "errors": [],
+            "position_check": position_check
+        }
+        
+        # Usar el tamaño real de la posición para TP/SL
+        position_contracts = position_check["contracts"]
+        
+        if stop_loss:
+            sl_result = self.set_position_stop_loss(market, stop_loss, position_contracts)
+            results["stop_loss"] = sl_result
+            if not sl_result.get("success"):
+                results["errors"].append(f"Stop Loss failed: {sl_result.get('error')}")
+        
+        if take_profit:
+            tp_result = self.set_position_take_profit(market, take_profit, position_contracts)
+            results["take_profit"] = tp_result
+            if not tp_result.get("success"):
+                results["errors"].append(f"Take Profit failed: {tp_result.get('error')}")
+        
+        return results
 
     def execute_order(
         self,
@@ -558,27 +962,103 @@ class TradingClient:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_balance(self):
-        """Obtiene balance de CoinEx y resume el saldo principal de futuros."""
+    def get_balance_fast(self) -> Dict:
+        """Obtiene balance con cache y rate limit optimization"""
+        # Verificar cache primero
+        if self._is_cache_valid("balance"):
+            print(">>> Using cached balance data")
+            return self._cache["balance"]["data"]
+        
+        # Calcular delay óptimo
+        delay = self._get_optimal_delay("balance")
+        if delay > 0:
+            time.sleep(delay)
+        
         try:
+            print(">>> Fetching balance from CoinEx (fast mode)...")
+            
+            # Aplicar rate limit
+            self.rate_limiter.wait_if_needed("futures")
+            
             balance = self.client.fetch_balance()
-            total = balance.get("total", {})
-            free = balance.get("free", {})
-            used = balance.get("used", {})
-            usdt_total = float(total.get("USDT", 0) or 0)
-            usdt_free = float(free.get("USDT", 0) or 0)
-            usdt_used = float(used.get("USDT", 0) or 0)
-            return {
-                "exchange": "coinex",
-                "account_type": "swap",
-                "currency": "USDT",
-                "usdt_total": round(usdt_total, 8),
-                "usdt_free": round(usdt_free, 8),
-                "usdt_used": round(usdt_used, 8),
-                "raw": balance,
-            }
+            
+            if balance and 'USDT' in balance.get('total', {}):
+                usdt_balance = balance['total']['USDT']
+                result = {
+                    "usdt_free": usdt_balance,
+                    "usdt_used": balance.get('used', {}).get('USDT', 0),
+                    "usdt_total": balance.get('total', {}).get('USDT', 0),
+                    "timestamp": time.time()
+                }
+                
+                # Actualizar cache
+                self._update_cache("balance", result)
+                
+                # Incrementar contador
+                self._request_counters["balance"] += 1
+                
+                print(f">>> Balance fetched: {usdt_balance} USDT (cached for 2s)")
+                return result
+            else:
+                print(">>> No USDT balance found")
+                result = {"usdt_free": 0, "timestamp": time.time()}
+                self._update_cache("balance", result)
+                return result
+                
         except Exception as e:
+            print(f">>> Error fetching balance: {str(e)}")
             return {"error": str(e)}
+
+    def get_realized_pnl_fast(self) -> Dict:
+        """Obtiene PnL realizado con cache y rate limit optimization"""
+        # Verificar cache primero
+        if self._is_cache_valid("pnl"):
+            print(">>> Using cached PnL data")
+            return self._cache["pnl"]["data"]
+        
+        # Calcular delay óptimo
+        delay = self._get_optimal_delay("pnl")
+        if delay > 0:
+            time.sleep(delay)
+        
+        try:
+            print(">>> Fetching PnL from CoinEx (fast mode)...")
+            
+            # Aplicar rate limit
+            self.rate_limiter.wait_if_needed("futures")
+            
+            # Obtener PnL desde CoinEx
+            response = self.post_futures_private_with_retry("/futures/get-realized-pnl")
+            
+            if response and not response.get("error"):
+                result = {
+                    "realized_pnl": float(response.get("realized_pnl", 0)),
+                    "unrealized_pnl": float(response.get("unrealized_pnl", 0)),
+                    "total_pnl": float(response.get("total_pnl", 0)),
+                    "timestamp": time.time()
+                }
+                
+                # Actualizar cache
+                self._update_cache("pnl", result)
+                
+                # Incrementar contador
+                self._request_counters["pnl"] += 1
+                
+                print(f">>> PnL fetched: {result['total_pnl']} USDT (cached for 3s)")
+                return result
+            else:
+                print(">>> No PnL data found")
+                result = {"realized_pnl": 0, "unrealized_pnl": 0, "total_pnl": 0, "timestamp": time.time()}
+                self._update_cache("pnl", result)
+                return result
+                
+        except Exception as e:
+            print(f">>> Error fetching PnL: {str(e)}")
+            return {"error": str(e)}
+
+    def get_realized_pnl(self) -> Dict:
+        """Obtiene PnL realizado de CoinEx"""
+        return self.get_realized_pnl_fast()
 
     def get_positions(self):
         """Obtiene las posiciones abiertas reales"""

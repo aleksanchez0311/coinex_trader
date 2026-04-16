@@ -42,47 +42,59 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 
 ```
 trader/
-├── app/                          # Aplicación
+├── app/                          # Aplicación principal
 │   ├── backend/                  # FastAPI (Python)
 │   │   ├── main.py               # Endpoints API
 │   │   ├── requirements.txt      # Dependencias Python
-│   │   ├── engines/
-│   │   │   ├── analysis.py       # Motor de análisis SMC
-│   │   │   ├── scoring.py        # Scoring de setups
-│   │   │   └── risk.py           # Gestión de riesgo
+│   │   ├── engines/              # Motores de análisis
+│   │   │   ├── analysis.py       # Análisis SMC + trading plan
+│   │   │   ├── risk.py           # Gestión de riesgo
+│   │   │   └── scoring.py       # Scoring de calidad de trade
 │   │   ├── models/
 │   │   │   └── trading.py        # Modelos Pydantic
 │   │   └── utils/
-│   │       └── exchange_clients.py # Clientes CoinEx/OKX (CCXT)
+│   │       └── exchange_clients.py # Clientes exchange (OKX market data, CoinEx trading)
 │   └── frontend/                 # React + Vite
 │       ├── src/
-│       │   ├── main.jsx          # Entry point React
-│       │   ├── index.css         # Estilos Tailwind
+│       │   ├── main.jsx          # Entry point
+│       │   ├── index.css         # Estilos Tailwind + tema
 │       │   ├── App.css           # Estilos globales
-│       │   ├── App.jsx           # Componente principal
+│       │   ├── App.jsx           # App principal con estado
 │       │   ├── components/       # Componentes UI
-│       │   │   ├── MarketList.jsx
-│       │   │   ├── AnalysisBoard.jsx
-│       │   │   ├── PositionsTable.jsx
-│       │   │   ├── Sidebar.jsx
-│       │   │   ├── Header.jsx
-│       │   │   ├── SettingsView.jsx
-│       │   │   ├── StrategyView.jsx
-│       │   │   ├── RiskManagementView.jsx
-│       │   │   └── RiskPanel.jsx
-│       │   └── assets/          # Recursos (SVG, imágenes)
+│       │   │   ├── ActionButtons.jsx     # Botones Plan & Info
+│       │   │   ├── AnalysisBoard.jsx      # Display análisis
+│       │   │   ├── Header.jsx            # Header + logo + PnL
+│       │   │   ├── MarketList.jsx        # Lista favoritos
+│       │   │   ├── PositionsTable.jsx   # Posiciones abiertas
+│       │   │   ├── Sidebar.jsx          # Navegación (colapsable)
+│       │   │   ├── SettingsView.jsx      # Config API y favoritos
+│       │   │   ├── StrategyView.jsx      # Display estrategia
+│       │   │   ├── RiskManagementView.jsx  # Vista gestión riesgo
+│       │   │   ├── RiskPanel.jsx         # Panel riesgo avanzado
+│       │   │   └── modals/           # Componentes modales
+│       │   │       ├── PlanOperativoModal.jsx
+│       │   │       ├── InfoAvanzadaModal.jsx
+│       │   │       └── ConfirmOrderModal.jsx
+│       │   ├── assets/          # Recursos (SVG, imágenes)
+│       │   └── config/          # Configuración app
 │       ├── public/
-│       │   ├── index.html       # HTML template
-│       │   └── favicon.svg      # Icono
+│       │   └── index.html       # HTML template
+│       ├── android/             # Proyecto Android (Capacitor)
+│       ├── capacitor.config.json # Config Capacitor
 │       ├── package.json
-│       ├── tailwind.config.js
+│       ├── tailwind.config.js   # Tema dark premium
 │       ├── vite.config.js
 │       ├── postcss.config.js
 │       └── eslint.config.js
-├── release/                      # Launcher Windows
-│   ├── exeify.bat              # Script de compilación
+├── release/                      # Builds multiplataforma
+│   ├── exeify.bat              # Script compilación Windows
 │   ├── iconify.bat             # Generador de icono
-│   └── exeify.cs               # Código fuente C#
+│   ├── exeify.cs               # Código fuente C# launcher
+│   ├── apkify.bat              # Script compilación Android
+│   ├── add_camera.ps1          # Script permisos cámara Android
+│   ├── requirements.txt        # Dependencias launcher
+│   ├── CoinEx Trader-release.apk # APK Android firmado
+│   └── edge-function/          # Funciones edge (futuro)
 ├── CoinExTrader.exe              # Ejecutable compilado
 ├── favicon.ico                   # Icono de la aplicación
 ├── .env.example                  # Variables de entorno ejemplo
@@ -112,8 +124,10 @@ Dependencias:
 - pydantic
 - python-dotenv
 - scipy
-- cairosvg
-- pillow
+- aiodns
+- aiohttp
+- yarl
+- requests
 
 ### Frontend
 
@@ -135,6 +149,13 @@ Dependencias:
 - lightweight-charts
 - clsx
 - tailwind-merge
+- @capacitor/android
+- @capacitor/cli
+- @capacitor/core
+- @capacitor/ios
+- html5-qrcode
+- autoprefixer
+- postcss
 
 ## ⚙️ Configuración
 
@@ -180,7 +201,7 @@ Las credenciales configuradas en la página de **Configuración** tienen priorid
 La estrategia combina:
 
 - **SMC**: Detección de liquidez institucional, FVG, Order Blocks
-- **EMA 20/50/200**: Dirección de tendencia
+- **EMA 20/70/200**: Dirección de tendencia
 - **RSI**: Timing de entrada (40-60)
 - **ATR**: Stop Loss basado en volatilidad
 - **Volumen**: Validación de movimientos
@@ -203,76 +224,37 @@ La estrategia combina:
 | `/tickers` | POST | Precio de múltiples símbolos (batch) |
 | `/market-status` | GET | Estado de conexión y pares activos |
 
-## 🖥️ Ejecutable Windows (Launcher)
-
-El launcher descarga el proyecto desde GitHub, instala dependencias y ejecuta automáticamente.
-
-### Compilar el ejecutable
-
-```cmd
-cd release
-exeify.bat
-```
-
-Genera `CoinExTrader.exe` + `favicon.ico`
-
-### Requisitos previos
-
-1. **.NET Framework 4.x** (incluido en Windows 10/11)
-2. **Git**
-3. **Python**
-4. **Node.js**
-
-### Uso
-
-1. Ejecutar `CoinExTrader.exe`
-2. El proyecto se ejecuta desde el directorio del exe
-3. Instala dependencias (backend + frontend)
-4. Inicia servidores y abre navegador en `http://localhost:5173`
-5. Icono en System Tray → "Abrir en el Navegador" o "Apagar y Salir"
-
-### Actualizar proyecto
-
-Hacer click derecho en el icono del tray → "Recargar Proyecto" (hace git pull)
-
-### Uso del Launcher
-
-1. Ejecutar `CoinExTrader.exe`
-2. Ver ventana de carga mientras se inicializan los servidores
-3. Se abre automáticamente el navegador en `http://localhost:5173`
-4. El icono queda en el área de notificaciones (System Tray)
-5. **Click derecho** → "Abrir en el Navegador" o "Apagar y Salir"
-
-### Características
-
-- **Silencioso**: No muestra ventana de terminal
-- **Control de procesos**: Inicia y termina Python y Node.js correctamente
-- **Prevención de duplicados**: Si ya está corriendo, solo abre el navegador
-- **Icono personalizado**: Usa el icono del proyecto
-
 ## ð¦ Android APK (Capacitor)
 
 ### Compilar APK
 
 ```cmd
 cd release
-apkify.bat
+apkify.bat --default
+```
+
+O para firmar APK existente:
+```cmd
+cd release
+apkify.bat --sign-only
 ```
 
 ### Requisitos previos
 
 1. **Java 22+** (Eclipse Adoptium JDK)
-2. **Android SDK** (API Level 34+)
-3. **Node.js**
-4. **Gradle**
+2. **Android SDK** (API Level 35+)
+3. **Node.js 18+**
+4. **Gradle 8.10.2+**
 
 ### Configuración
 
 El script `apkify.bat` configura automáticamente:
-- **Capacitor**: Framework para apps nativas
+- **Capacitor 7**: Framework para apps nativas
 - **Android Studio**: Build y debugging
-- **Keystore**: Firma digital del APK
+- **Keystore**: Firma digital del APK (keystore auto-generado)
 - **Package ID**: `cu.limitlesscode.coinextraderandroid`
+- **Permisos**: Cámara (para QR code scanning)
+- **Build Tools**: Android SDK Build Tools 35.0.0
 
 ### Características Android
 
@@ -280,6 +262,10 @@ El script `apkify.bat` configura automáticamente:
 - **Offline**: Funciona sin conexión (datos cacheados)
 - **Notificaciones**: Alertas de trading push
 - **Responsive**: UI adaptada a móviles
+- **QR Scanner**: Integración con html5-qrcode para escanear API keys
+- **Capacitor 7**: Última versión del framework híbrido
+- **Java 22**: Compilación con JDK más reciente
+- **Target SDK 35**: Compatible con Android 14+
 
 ## ðª Componentes UI
 
@@ -292,9 +278,9 @@ El script `apkify.bat` configura automáticamente:
 - **SettingsView.jsx**: Configuración de API y mercados favoritos
 
 ### Componentes Modales
-- **PlanOperativoModal.jsx**: Modal glassmorphism con plan de trading completo
-- **InfoAvanzadaModal.jsx**: Modal con información técnica detallada
-- **ConfirmOrderModal.jsx**: Modal de confirmación de orden con parámetros
+- **PlanOperativoModal.jsx**: Modal glassmorphism con plan completo (sesgo, escenarios, entry/SL/TP, R:R)
+- **InfoAvanzadaModal.jsx**: Modal técnico con análisis SMC, indicadores, niveles clave
+- **ConfirmOrderModal.jsx**: Modal confirmación con cálculo margen, riesgo, modo orden
 
 ### Sistema de Diseño
 

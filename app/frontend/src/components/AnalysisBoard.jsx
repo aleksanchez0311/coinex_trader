@@ -66,7 +66,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
                 cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
                 strokeDasharray={364.4}
                 strokeDashoffset={364.4 - (364.4 * (scoring?.total_score || 0)) / 100}
-                className={(scoring?.total_score || 0) > 70 ? 'text-long' : (scoring?.total_score || 0) > 50 ? 'text-accent' : 'text-short'}
+                className={(scoring?.total_score || 0) > 70 ? 'text-long' : (scoring?.total_score || 0) > 70 ? 'text-accent' : 'text-short'}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">

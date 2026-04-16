@@ -42,15 +42,23 @@ trader/
 │       │           ├── InfoAvanzadaModal.jsx
 │       │           └── ConfirmOrderModal.jsx
 │       ├── public/
+│       │   └── index.html       # HTML template
+│       ├── android/             # Proyecto Android (Capacitor)
+│       ├── capacitor.config.json # Config Capacitor
 │       ├── package.json
 │       ├── tailwind.config.js     # Premium dark theme
 │       ├── vite.config.js
 │       ├── postcss.config.js
 │       └── eslint.config.js
-├── release/                      # Windows executable
-│   ├── exeify.bat              # Build script
+├── release/                      # Builds multiplataforma
+│   ├── exeify.bat              # Build script Windows
 │   ├── iconify.bat             # Icon generator
-│   └── exeify.cs               # Launcher source
+│   ├── exeify.cs               # Launcher C# source
+│   ├── apkify.bat              # Build APK script Android
+│   ├── add_camera.ps1          # Camera permissions script
+│   ├── requirements.txt        # Python dependencies launcher
+│   ├── CoinEx Trader-release.apk # APK Android firmado
+│   └── edge-function/          # Edge functions (futuro)
 ├── CoinExTrader.exe             # Compiled executable
 ├── favicon.ico                  # Application icon
 ├── .env.example                 # Environment template
@@ -94,12 +102,19 @@ trader/
 - `app/frontend/src/App.css` - Global styles
 - `app/frontend/tailwind.config.js` - Color palette: #0B0E11 background, #00C076 long, #CF304A short
 
-### Launcher
+### Launcher Windows
 - `release/exeify.bat` - Build executable script (Windows)
 - `release/iconify.bat` - Icon generator
 - `release/exeify.cs` - C# launcher code
-- `release/apkify.bat` - Build APK script (Android)
 - `release/requirements.txt` - Python dependencies for launcher
+
+### APK Build Android
+- `release/apkify.bat` - Build APK script Android
+- `release/add_camera.ps1` - Camera permissions script
+- Java 22+ compilation
+- Android SDK 35+ target
+- Capacitor 7 framework
+- Gradle 8.10.2+ build system
 
 ## Design System
 
@@ -135,7 +150,10 @@ cd app/frontend && npm run dev
 cd release && exeify.bat
 
 # Build APK (Android)
-cd release && apkify.bat
+cd release && apkify.bat --default
+
+# Sign APK existente
+cd release && apkify.bat --sign-only
 ```
 
 ## Configuration
@@ -164,6 +182,39 @@ cd app/backend && pytest
 cd app/frontend && npm run lint
 ```
 
+## Dependencies
+
+### Backend (requirements.txt)
+- fastapi, uvicorn, pandas, numpy, ccxt, pydantic
+- python-dotenv, scipy, aiodns, aiohttp, yarl, requests
+
+### Frontend (package.json)
+- React 19.2.4, Vite 8.0.4, TailwindCSS 4.2.2
+- Capacitor 7.0.0 (android, cli, core, ios)
+- html5-qrcode 2.3.8, lightweight-charts 5.1.0
+- framer-motion 12.38.0, lucide-react 1.8.0
+- axios, clsx, tailwind-merge, autoprefixer, postcss
+
+### Build Tools
+- Java 22+ (Android compilation)
+- Android SDK 35+ (target)
+- Gradle 8.10.2+ (build system)
+- .NET Framework 4.x (Windows launcher)
+
+## Recent Updates
+
+- **Capacitor 7**: Updated to latest version
+- **QR Scanner**: html5-qrcode integration for API keys
+- **Android SDK 35**: Support for Android 14+
+- **Java 22**: Latest JDK compilation
+- **Build Tools 35.0.0**: Updated Android build tools
+- **Multiple APKs**: Release and aligned APKs generated
+
 ## Known Issues
 
-- None currently
+- Paper trading mode not implemented (LIVE only)
+- Windows launcher only (no Linux/macOS support)
+- iOS app not available (Android only)
+- No OCO or trailing stop orders
+- CORS allowed for any origin (development only)
+- Limited offline functionality
