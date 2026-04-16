@@ -1,37 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Search, Plus, Trash2, TrendingUp, ScanLine, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Settings, Search, Plus, Trash2, TrendingUp, ScanLine, X, Lock, ShieldCheck, Database, Globe, Filter } from 'lucide-react';
 import API_URL from '../config/api';
 import { Html5Qrcode } from 'html5-qrcode';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const SettingsView = ({ credentials, setCredentials, saveCredentials }) => {
   const [allMarkets, setAllMarkets] = useState([]);
   const [topGainers, setTopGainers] = useState([]);
-const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showScanner, setShowScanner] = useState(false);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
   const html5QrCodeRef = useRef(null);
   
   const isAndroid = /Android/i.test(navigator.userAgent);
   
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('trader_favorites');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return [
-      'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 
-      'ADA/USDT', 'DOGE/USDT', 'AVAX/USDT', 'LINK/USDT', 'DOT/USDT'
-    ];
+    if (saved) return JSON.parse(saved);
+    return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
   });
 
   const fetchMarkets = async () => {
+    setLoadingMarkets(true);
     try {
-      const response = await fetch(`${API_URL}/top-gainers?limit=100&sort_by=volume&verified_only=true`);
+      const response = await fetch(`${API_URL}/top-gainers?limit=300&sort_by=volume&verified_only=true`);
       const data = await response.json();
       if (Array.isArray(data)) setAllMarkets(data);
-    } catch (error) {
-      console.error("Error fetching markets:", error);
-    }
+    } catch (error) { console.error("Error fetching markets:", error); }
+    finally { setLoadingMarkets(false); }
   };
 
   const fetchTopGainers = async () => {
@@ -39,15 +36,25 @@ const [activeTab, setActiveTab] = useState('all');
       const response = await fetch(`${API_URL}/top-gainers?limit=30&verified_only=true`);
       const data = await response.json();
       if (Array.isArray(data)) setTopGainers(data);
-    } catch (error) {
-      console.error("Error fetching gainers:", error);
-    }
+    } catch (error) { console.error("Error fetching gainers:", error); }
   };
 
   useEffect(() => {
     fetchMarkets();
     fetchTopGainers();
-}, []);
+  }, []);
+
+  // FILTRO INTELIGENTE: Ignora barras y es insensible a mayúsculas
+  const displayedMarkets = useMemo(() => {
+    const source = activeTab === 'all' ? allMarkets : topGainers;
+    if (!searchTerm.trim()) return source;
+
+    const term = searchTerm.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return source.filter(m => {
+      const symbol = m.symbol.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return symbol.includes(term);
+    }).sort((a, b) => (b.volume || 0) - (a.volume || 0));
+  }, [searchTerm, allMarkets, topGainers, activeTab]);
 
   const startScanner = async () => {
     setShowScanner(true);
@@ -60,33 +67,22 @@ const [activeTab, setActiveTab] = useState('all');
           (decodedText) => {
             try {
               const parsed = JSON.parse(decodedText);
-              if (parsed.apiKey && parsed.apiSecret) {
-                setCredentials({ apiKey: parsed.apiKey, apiSecret: parsed.apiSecret });
-              } else if (parsed.key && parsed.secret) {
-                setCredentials({ apiKey: parsed.key, apiSecret: parsed.secret });
-              } else {
-                setCredentials({ apiKey: decodedText, apiSecret: '' });
-              }
-            } catch {
-              setCredentials({ apiKey: decodedText, apiSecret: '' });
-            }
+              setCredentials({ 
+                apiKey: parsed.apiKey || parsed.key || decodedText, 
+                apiSecret: parsed.apiSecret || parsed.secret || '' 
+              });
+            } catch { setCredentials({ apiKey: decodedText, apiSecret: '' }); }
             stopScanner();
           },
           () => {}
         );
-      } catch (err) {
-        console.error("Error starting scanner:", err);
-        setShowScanner(false);
-      }
+      } catch (err) { setShowScanner(false); }
     }, 100);
   };
 
   const stopScanner = async () => {
     if (html5QrCodeRef.current) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current = null;
-      } catch {}
+      try { await html5QrCodeRef.current.stop(); html5QrCodeRef.current = null; } catch {}
     }
     setShowScanner(false);
   };
@@ -94,229 +90,213 @@ const [activeTab, setActiveTab] = useState('all');
   const saveFavoritesList = (newList) => {
     setFavorites(newList);
     localStorage.setItem('trader_favorites', JSON.stringify(newList));
-    // Disparar evento para que MarketList se entere instantaneamente
     window.dispatchEvent(new Event('favorites_updated'));
   };
 
   const addFavorite = (symbol) => {
-    if (!favorites.includes(symbol)) {
-      saveFavoritesList([symbol, ...favorites]);
-    }
+    if (!favorites.includes(symbol)) saveFavoritesList([symbol, ...favorites]);
   };
 
   const removeFavorite = (symbol) => {
     saveFavoritesList(favorites.filter(s => s !== symbol));
   };
 
-  const displayedMarkets = (activeTab === 'all' 
-    ? allMarkets.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
-    : topGainers.filter(m => m.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
-  ).sort((a, b) => (b.volume || b.percentage || 0) - (a.volume || a.percentage || 0));
-
   return (
-    <div className="max-w-6xl mx-auto space-y-4 md:space-y-6 px-2 md:px-0">
-      {/* Configuración API */}
-      <div className="glass p-4 md:p-8">
-        <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 flex items-center gap-2">
-          <Settings className="text-accent" /> Configuración de API CoinEx
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">API Key</label>
-            <input 
-              type="password" 
-              value={credentials.apiKey}
-              onChange={(e) => setCredentials({...credentials, apiKey: e.target.value})}
-              placeholder="Tu API Key" 
-              className="w-full bg-surface border border-border p-2 md:p-3 rounded-lg outline-none focus:border-accent text-sm" 
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">API Secret</label>
-            <input 
-              type="password" 
-              value={credentials.apiSecret}
-              onChange={(e) => setCredentials({...credentials, apiSecret: e.target.value})}
-              placeholder="Tu API Secret" 
-              className="w-full bg-surface border border-border p-2 md:p-3 rounded-lg outline-none focus:border-accent text-sm" 
-            />
-      </div>
-
-      {showScanner && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-border rounded-2xl p-4 w-full max-w-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg text-white">Escanear QR</h3>
-              <button onClick={stopScanner} className="text-gray-400 hover:text-white">
-                <X size={24} />
-              </button>
-            </div>
-            <div id="qr-reader" className="w-full rounded-lg overflow-hidden" />
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              Apunta la cámara al código QR de CoinEx
-            </p>
-          </div>
+    <div className="max-w-6xl mx-auto space-y-8 py-6">
+      {/* Header Seccion */}
+      <div className="flex items-center gap-6 mb-10">
+        <div className="p-4 bg-accent/10 rounded-3xl border border-accent/20">
+          <Settings size={32} className="text-accent" />
         </div>
-      )}
-    </div>
-        <div className="flex flex-wrap gap-2 md:gap-3">
-          <button 
-            onClick={() => {
-              const saved = localStorage.getItem('trader_creds');
-              if (saved) setCredentials(JSON.parse(saved));
-            }}
-            className="bg-surface border border-accent text-accent font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-accent/10 transition-colors text-sm"
-          >
-            Restaurar Local
-          </button>
-          <button 
-            onClick={() => saveCredentials(credentials)}
-            className="bg-accent text-black font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:opacity-90 transition-opacity text-sm"
-          >
-            Guardar
-          </button>
-          <button 
-            onClick={() => {
-              localStorage.removeItem('trader_creds');
-              setCredentials({ apiKey: '', apiSecret: '' });
-            }}
-            className="bg-transparent border border-short text-short font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-short/10 transition-colors ml-auto text-sm"
-          >
-Borrar
-          </button>
-          {isAndroid && (
-            <button 
-              onClick={startScanner}
-              className="bg-accent/20 text-accent font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-accent/30 transition-colors text-sm flex items-center gap-2"
-            >
-              <ScanLine size={18} /> Escanear QR
-            </button>
-          )}
+        <div>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Configuración</h2>
+          <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.3em]">Gestión de Seguridad & Activos</p>
         </div>
       </div>
 
-      {/* Editor de Favoritos */}
-      <div className="glass p-4 md:p-8">
-        <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 flex items-center gap-2">
-          <Search className="text-accent" /> Gestor de Pares Favoritos
-        </h2>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
-          
-          {/* Explorador de Mercados */}
-          <div className="flex flex-col border border-border/40 rounded-xl bg-surface/30 h-[400px] md:h-[500px]">
-             <div className="p-3 md:p-4 border-b border-border/20">
-              <div className="flex gap-2 mb-2 md:mb-3">
-                <button 
-                  onClick={() => setActiveTab('all')} 
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-accent text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                >
-                  Todos
-                </button>
-                <button 
-                  onClick={() => setActiveTab('gainers')} 
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex justify-center items-center gap-1 ${activeTab === 'gainers' ? 'bg-long text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                >
-                  <TrendingUp size={14} /> Ganadores
-                </button>
-              </div>
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar símbolo..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-surface border border-border p-2 md:p-2.5 pl-10 rounded-lg outline-none focus:border-accent transition-all text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 scrollbar-premium">
-              {(activeTab === 'all' && allMarkets.length === 0) || (activeTab === 'gainers' && topGainers.length === 0) ? (
-                <div className="p-10 text-center space-y-3">
-                  <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm text-gray-500">Cargando...</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Lado Izquierdo: Configuración API (Bóveda) */}
+        <div className="lg:col-span-1 space-y-6">
+            <div className="glass p-8 rounded-[2.5rem] border-white/5 bg-gradient-to-b from-white/5 to-transparent relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <Lock size={120} />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-1">
-                  {displayedMarkets.length > 0 ? (
-                    displayedMarkets.map((m) => {
-                      const isFav = favorites.includes(m.symbol);
-                      return (
-                        <div key={m.symbol} className="flex items-center justify-between p-2 hover:bg-accent/5 rounded-lg transition-colors group">
-                          <div className="flex items-center gap-2 md:gap-3">
-                            <div className={`w-8 h-8 rounded bg-surface border flex items-center justify-center font-bold text-[10px] ${activeTab === 'gainers' ? 'border-long/30 text-long' : 'border-border text-accent'}`}>
-                              {m.base.substring(0, 3)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm">
-                                {m.symbol} {activeTab === 'gainers' && <span className="ml-2 text-long text-xs">{m.percentage > 0 ? '+' : ''}{m.percentage.toFixed(2)}%</span>}
-                              </p>
-                              <p className="text-[10px] text-gray-500 uppercase">{m.base} / {m.quote}</p>
-                            </div>
-                          </div>
-                          {!isFav ? (
-                            <button 
-                              onClick={() => addFavorite(m.symbol)}
-                              className="p-1.5 rounded-md bg-accent/10 text-accent hover:bg-accent hover:text-black transition-colors"
-                              title="Agregar"
-                            >
-                              <Plus size={16} />
-                            </button>
-                          ) : (
-                            <span className="text-[10px] bg-white/5 py-1 px-2 rounded text-gray-500">
-                              ✓
-                            </span>
-                          )}
+                
+                <h3 className="font-black text-xs text-gray-500 uppercase tracking-widest mb-8 flex items-center gap-2">
+                    <ShieldCheck size={14} className="text-accent" /> Credenciales CoinEx
+                </h3>
+
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-[9px] text-gray-600 font-black uppercase tracking-widest ml-1">API Key</label>
+                        <div className="relative">
+                            <input 
+                            type="password" 
+                            value={credentials.apiKey}
+                            onChange={(e) => setCredentials({...credentials, apiKey: e.target.value})}
+                            className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-accent text-sm font-mono text-white transition-all" 
+                            placeholder="Ingrese su Key"
+                            />
+                            <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-700" size={16} />
                         </div>
-                      )
-                    })
-                  ) : (
-                    <div className="p-10 text-center text-gray-500 italic text-sm">
-                      Sin resultados
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Lista de Seleccionados */}
-          <div className="flex flex-col border border-border/40 rounded-xl bg-surface/30 h-[400px] md:h-[500px]">
-            <div className="p-3 md:p-4 border-b border-border/20 bg-white/5">
-              <h3 className="font-bold text-sm flex items-center justify-between">
-                Tus Favoritos
-                <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">{favorites.length}</span>
-              </h3>
-              <p className="text-xs text-gray-400 mt-1 hidden md:block">Estos pares aparecerán en tu Dashboard.</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 scrollbar-premium">
-              {favorites.length === 0 ? (
-                <div className="p-10 text-center text-gray-500 text-sm italic">
-                  Sin favoritos.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-1">
-                  {favorites.map(symbol => (
-                    <div key={symbol} className="flex items-center justify-between p-2 md:p-3 bg-surface border border-border rounded-lg group">
-                      <span className="font-bold text-sm">{symbol}</span>
-                      <button 
-                        onClick={() => removeFavorite(symbol)}
-                        className="text-gray-500 hover:text-short p-1 rounded-md hover:bg-short/10 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <div className="space-y-2">
+                        <label className="text-[9px] text-gray-600 font-black uppercase tracking-widest ml-1">API Secret</label>
+                        <div className="relative">
+                            <input 
+                            type="password" 
+                            value={credentials.apiSecret}
+                            onChange={(e) => setCredentials({...credentials, apiSecret: e.target.value})}
+                            className="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-accent text-sm font-mono text-white transition-all" 
+                            placeholder="Ingrese su Secret"
+                            />
+                            <Database className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-700" size={16} />
+                        </div>
                     </div>
-                  ))}
                 </div>
-              )}
-            </div>
-          </div>
 
+                <div className="mt-10 grid grid-cols-2 gap-3">
+                    <button 
+                        onClick={() => saveCredentials(credentials)}
+                        className="col-span-2 bg-accent text-background font-black text-xs uppercase py-4 rounded-2xl hover:brightness-110 shadow-lg shadow-accent/20 transition-all"
+                    >
+                        Guardar Bóveda
+                    </button>
+                    {isAndroid && (
+                        <button 
+                            onClick={startScanner}
+                            className="bg-white/5 text-gray-300 font-bold text-[10px] py-3 rounded-xl border border-white/10 flex items-center justify-center gap-2 uppercase tracking-widest"
+                        >
+                            <ScanLine size={14} /> Scanner
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => { localStorage.removeItem('trader_creds'); setCredentials({ apiKey: '', apiSecret: '' }); }}
+                        className="bg-short/5 text-short font-bold text-[10px] py-3 rounded-xl border border-short/10 uppercase tracking-widest"
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {/* Lado Derecho: Gestor de Favoritos (2 columnas) */}
+        <div className="lg:col-span-2 space-y-6">
+            <div className="glass p-8 rounded-[2.5rem] border-white/5 min-h-[500px] flex flex-col relative overflow-hidden">
+                {loadingMarkets && (
+                    <div className="absolute top-0 left-0 w-full h-1">
+                        <div className="h-full bg-accent animate-progress origin-left"></div>
+                    </div>
+                )}
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                    <div>
+                        <h3 className="font-black text-xs text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <Globe size={14} className="text-accent" /> Gestor de Mercado
+                        </h3>
+                        <p className="text-xs text-gray-400 font-medium">Controla los activos que fluyen a tu Dashboard.</p>
+                    </div>
+                    
+                    <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                        {[
+                          { id: 'all', label: 'Todos', icon: Globe },
+                          { id: 'gainers', label: 'Top Vol.', icon: TrendingUp }
+                        ].map(t => (
+                          <button 
+                            key={t.id}
+                            onClick={() => setActiveTab(t.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === t.id ? 'bg-accent text-background' : 'text-gray-500'}`}
+                          >
+                            <t.icon size={12} /> {t.label}
+                          </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="relative mb-6">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-600" size={18} />
+                    <input 
+                        type="search" 
+                        placeholder="BUSCAR PAR (BTC, ETH, SOL...)"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-black/20 border border-white/5 p-4 pl-14 rounded-2xl outline-none focus:border-white/20 text-xs font-bold text-white uppercase tracking-widest"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
+                    {/* Explorador */}
+                    <div className="space-y-4 flex flex-col">
+                        <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest px-1">Resultados</span>
+                        <div className="space-y-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-2 flex-1">
+                            {displayedMarkets.length > 0 ? displayedMarkets.map((m) => (
+                                <div key={m.symbol} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 group transition-all">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-black text-white">{m.symbol}</span>
+                                        <span className="text-[8px] text-gray-600 uppercase font-bold">{m.volume?.toLocaleString() || '---'} Vol.</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => addFavorite(m.symbol)}
+                                        disabled={favorites.includes(m.symbol)}
+                                        className={`p-2 rounded-lg transition-all ${favorites.includes(m.symbol) ? 'text-long opacity-100' : 'bg-accent/10 text-accent hover:bg-accent hover:text-background'}`}
+                                    >
+                                        {favorites.includes(m.symbol) ? '✓' : <Plus size={16} />}
+                                    </button>
+                                </div>
+                            )) : (
+                                <div className="py-20 text-center">
+                                    <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Sin coincidencias</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Mi Watchlist */}
+                    <div className="space-y-4 flex flex-col">
+                        <div className="flex justify-between items-center px-1">
+                            <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Mi Watchlist</span>
+                            <span className="text-[10px] font-mono text-accent bg-accent/10 px-2 py-0.5 rounded-md">{favorites.length}</span>
+                        </div>
+                        <div className="space-y-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-2 flex-1">
+                            {favorites.map((symbol) => (
+                                <div key={symbol} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 group transition-all">
+                                    <span className="text-xs font-black text-white tracking-widest">{symbol}</span>
+                                    <button 
+                                        onClick={() => removeFavorite(symbol)}
+                                        className="p-2 text-gray-600 hover:text-short transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
       </div>
+
+      {/* Modal Scanner QR - Estética premium */}
+      <AnimatePresence>
+        {showScanner && (
+            <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex items-center justify-center p-6"
+            >
+                <div className="glass p-8 w-full max-w-sm rounded-[3rem] border border-white/10 text-center">
+                    <div className="flex justify-between items-center mb-6">
+                        <h4 className="font-black text-xs text-white uppercase tracking-widest">Sincronización QR</h4>
+                        <button onClick={stopScanner} className="p-2 bg-white/5 rounded-full"><X size={20} /></button>
+                    </div>
+                    <div id="qr-reader" className="w-full rounded-3xl overflow-hidden border-2 border-accent/20" />
+                    <p className="mt-6 text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+                        Apunta la cámara al código QR de sesión de tu exchange para sincronizar credenciales instantáneamente
+                    </p>
+                </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

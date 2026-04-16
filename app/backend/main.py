@@ -1,8 +1,11 @@
 import os
+import json
 from dotenv import load_dotenv
 from typing import Dict, Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import json
+from contextlib import asynccontextmanager
 import pandas as pd
 import numpy as np
 import time
@@ -50,7 +53,16 @@ def convert_numpy_types(obj: Any) -> Any:
 
 load_dotenv()
 
-app = FastAPI(title="CoinEx Trader API")
+# Instancias
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    task = asyncio.create_task(price_pusher_task())
+    yield
+    # Shutdown
+    task.cancel()
+
+app = FastAPI(title="CoinEx Trader API", lifespan=lifespan)
 
 ohlcv_cache: Dict[str, tuple] = {}
 derivatives_cache: Dict[str, tuple] = {}
@@ -108,9 +120,6 @@ async def price_pusher_task():
             print(f">>> Error in price pusher task: {e}")
             await asyncio.sleep(5)
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(price_pusher_task())
 
 
 @app.websocket("/ws")

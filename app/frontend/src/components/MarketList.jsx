@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Clock, Search, X, Calculator, Play, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, RefreshCw, Zap } from 'lucide-react';
 import API_URL from '../config/api';
 
 const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
@@ -11,14 +11,11 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-
-    // Event listener para actualizar desde LocalStorage (lanzado por SettingsView)
     const updateFavoritesFromStorage = () => {
       const saved = localStorage.getItem('trader_favorites');
       if (saved) {
         const parsed = JSON.parse(saved);
         setFavorites(current => {
-          // Mantener los precios existentes si coinciden los símbolos
           return parsed.map(sym => {
             const existing = current.find(f => f.symbol === sym);
             return existing || { symbol: sym, price: null, change: null, up: true };
@@ -66,27 +63,18 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
 
   useEffect(() => {
     loadPrices();
-    
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadPrices();
-      }
-    };
-    
+    const handleVisibilityChange = () => { if (!document.hidden) loadPrices(); };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('reload_prices_now', loadPrices);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('reload_prices_now', loadPrices);
     };
-  }, [favorites.length]); // Depend dependency on length so it re-triggers safely
+  }, [favorites.length]);
 
   const handleSelect = (symbol) => {
     setSelected(symbol);
-    if (onSymbolSelect) {
-      onSymbolSelect(symbol);
-    }
-    loadPrices();
+    if (onSymbolSelect) onSymbolSelect(symbol);
   };
 
   const formatPrice = (price) => {
@@ -96,56 +84,47 @@ const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
     return price.toFixed(4);
   };
 
-  const formatChange = (change) => {
-    if (change === null) return '0.0%';
-    const sign = change >= 0 ? '+' : '';
-    return `${sign}${change.toFixed(1)}%`;
-  };
-
   return (
-    <div className="glass p-3 md:p-5 space-y-3 md:space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold flex items-center gap-2 text-sm md:text-base">
-          <Clock size={16} className="text-accent" /> Favoritos
+    <div className="glass p-5 space-y-5 rounded-[2rem]">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="font-black flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-gray-500">
+          <Zap size={14} className="text-accent" fill="currentColor" /> Watchlist
         </h3>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-500 font-bold uppercase hidden sm:inline">Cambio 24h</span>
-          <button 
-            onClick={loadPrices}
-            disabled={loading}
-            className="p-1 hover:bg-white/10 rounded-md transition-colors disabled:opacity-50"
-            title="Refrescar precios"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin text-accent" : "text-gray-400"} />
-          </button>
-        </div>
+        <button 
+          onClick={loadPrices}
+          disabled={loading}
+          className="p-2 hover:bg-white/5 rounded-full transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin text-accent" : "text-gray-500"} />
+        </button>
       </div>
 
-      <div className="space-y-2 md:space-y-3 overflow-y-auto max-h-[280px] md:max-h-[350px] pr-2">
+      <div className="space-y-2 overflow-y-auto max-h-[350px] pr-1 custom-scrollbar">
         {favorites.map((pair) => (
           <div
             key={pair.symbol}
             onClick={() => handleSelect(pair.symbol)}
-            className={`p-2.5 md:p-3 rounded-lg cursor-pointer transition-all border ${
+            className={`p-4 rounded-2xl cursor-pointer transition-all border ${
               selected === pair.symbol 
-                ? 'bg-accent/5 border-accent/20' 
-                : 'border-transparent hover:bg-white/5'
+                ? 'bg-accent/10 border-accent/20 ring-1 ring-accent/10' 
+                : 'bg-white/5 border-transparent hover:bg-white/10'
             }`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-sm">{pair.symbol}</span>
-              <span className={`text-xs font-bold ${pair.up ? 'text-long' : 'text-short'}`}>
-                {formatChange(pair.change)}
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-black uppercase tracking-widest ${selected === pair.symbol ? 'text-white' : 'text-gray-400'}`}>
+                {pair.symbol}
+              </span>
+              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${pair.up ? 'bg-long/10 text-long' : 'bg-short/10 text-short'}`}>
+                {pair.change >= 0 ? '+' : ''}{pair.change?.toFixed(1) || '0.0'}%
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-base md:text-lg font-mono">${formatPrice(pair.price)}</span>
-              {pair.up ? <TrendingUp size={14} className="text-long" /> : <TrendingDown size={14} className="text-short" />}
+              <span className="text-xl font-mono font-bold text-white tabular-nums">${formatPrice(pair.price)}</span>
+              {pair.up ? <TrendingUp size={16} className="text-long" /> : <TrendingDown size={16} className="text-short" />}
             </div>
           </div>
         ))}
       </div>
-      
     </div>
   );
 };
