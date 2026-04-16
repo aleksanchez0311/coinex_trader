@@ -1,39 +1,54 @@
-# CoinEx Trader - Intraday Trading Platform
+# CoinEx Trader - Advanced Intraday Trading Platform
 
-Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart Money Concepts (SMC)** + EMA + RSI + ATR con soporte multiplataforma.
+Plataforma fullstack profesional para análisis y ejecución de trading intradía en criptomonedas (futuros), basada en **Smart Money Concepts (SMC)** con **detección avanzada de traps**, **análisis multi-factor** y **gestión de riesgo inteligente**. Soporte multiplataforma con UI premium dark mode.
 
-## 🚀 Características
+## Características Avanzadas
 
-### Análisis Técnico
-- **Análisis SMC Automatizado**: Detección de swings, BOS/CHOCH, liquidez, FVG, Order Blocks
+### Análisis Técnico Profesional
+- **Smart Money Concepts Engine**: Detección automática de swings, BOS/CHOCH, liquidez, FVG, Order Blocks
+- **Multi-Factor Bias Analysis**: 
+  - EMA bias (30% peso) + Structure bias (40% peso) + Open Interest bias (20% peso) + Price position bias (10% peso)
+  - Resultado: LONG/SHORT/NO TRADE con score cuantificado
 - **Indicadores Técnicos**: EMA 20/50/200, RSI (14), ATR (14) para confirmación de tendencia
 - **Checklist ORO**: Validación de 6 puntos pre-trade (tendencia EMA, estructura BOS, liquidez, OB/FVG, RSI en zona, volumen)
-- **Sistema de Scoring**: Evaluación de setups 0-100 basada en confluencias técnicas
-- **Trading Plan Generator**: Plan completo con sesgo principal, escenarios alternativos, entry/SL/TP, R:R
+- **Sistema de Scoring**: Evaluación de setups 0-100 basada en confluencias técnicas ponderadas
 
-### Gestión de Riesgo
-- **Motor de Riesgo**: Cálculo automático de posición, margen, SL (basado en ATR) y TP (R:R 1.5+)
-- **Position Sizing**: Basado en capital, % riesgo y apalancamiento configurables
-- **Múltiples TP**: TP1 (1.5R), TP2 (2.5R), TP3 (4R) para gestión parcial
+### Advanced Trap Detection System
+- **Bull Trap Detection**: Sesgo alcista + cerca resistencia + funding alto + volumen bajo
+- **Bear Trap Detection**: Sesgo bajista + cerca soporte + funding extremo + volumen bajo
+- **Probabilidad Calculada**: 0-100% basada en factores ponderados:
+  - Bull Trap: 35% (resistencia) + 25% (liquidez) + 25% (funding) + 15% (volumen)
+  - Bear Trap: 35% (soporte) + 25% (liquidez) + 25% (funding) + 15% (volumen)
+- **Position vs Trap Verification**: Verifica si entrada propuesta cae en zona de peligro (< 0.5%)
+- **Contingency Plans**: Contra-ataques automáticos si se detecta trap activo
 
-### Integraciones
+### Gestión de Riesgo Inteligente
+- **Motor de Riesgo Avanzado**: Cálculo automático de posición, margen, SL (basado en ATR) y TP (R:R 1.5+)
+- **Position Sizing**: Basado en capital, % riesgo y apalancamiento configurables (30% max capital, 20x leverage)
+- **Múltiples TP**: TP1 (1.5R), TP2 (2.5R), TP3 (4R) con gestión parcial de tamaño
+- **Margin Mode**: Isolated/Cross con configuración por operación
+- **Risk Assessment**: Análisis de distancia a zonas clave y recomendaciones claras
+
+### Integraciones Profesionales
 - **CoinEx Trading**: Ejecución real de órdenes Limit/Market con SL/TP automáticos
-- **OKX Market Data**: Datos de mercado OHLCV, tickers, funding rate
-- **Modo Aislado**: Gestión de riesgo por posición
+- **OKX Market Data**: Datos de mercado OHLCV, tickers, funding rate, liquidaciones
+- **Optimized API Calls**: Cache TTL-based, rate limiting, retry con exponential backoff
+- **PnL Management**: Realized PnL desde posiciones finalizadas + Unrealized PnL activas
 
 ### UI/UX Premium
 - **Diseño Dark Mode**: Tema oscuro premium con paleta #0B0E11 (Eerie Black)
-- **Glassmorphism**: Modales con efecto blur y transparencia
-- **Responsive**: Adaptable a desktop y móvil
-- **Actualización por Foco**: Datos se actualizan automáticamente cuando la app gana foco
-- **Header Centrado**: Widget de balance y PnL acumulado centrados en el navbar
+- **Glassmorphism**: Modales con efecto blur y transparencia avanzada
+- **Responsive Design**: Mobile-first con breakpoints optimizados
+- **Real-time Updates**: Auto-refresh por focus y cache inteligente
+- **Trap Analysis Display**: Visualización clara de probabilidad y riesgo de traps
+- **Advanced Modals**: Plan Operativo e Info Avanzada con información completa
 
 ### Multiplataforma
-- **Windows**: Ejecutable nativo (.exe) con launcher C#
-- **Android**: APK nativo con Capacitor
-- **Web**: Aplicación web progresiva (PWA) desplegada en Vercel
-  - Frontend: https://coinex-trader.vercel.app
-  - Backend: https://coinex-trader-backend.vercel.app
+- **Windows**: Ejecutable nativo (.exe) con launcher C# y auto-update
+- **Android**: APK nativo con Capacitor 7, Java 22, SDK 35
+- **Web**: Aplicación web progresiva (PWA) con optimización avanzada
+  - Frontend: React 19.2.4 + Vite 8.0.4 + TailwindCSS 4.2.2
+  - Backend: FastAPI + Python 3.11 con optimización de rendimiento
 
 ## Requisitos del Sistema
 

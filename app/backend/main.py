@@ -9,6 +9,7 @@ import time
 from engines.analysis import AnalysisEngine
 from engines.scoring import ScoringEngine
 from engines.risk import RiskEngine
+from utils.history_manager import HistoryManager
 from utils.exchange_clients import TradingClient, MarketDataClient
 from models.trading import (
     AnalysisRequest,
@@ -19,6 +20,8 @@ from models.trading import (
     TickersBatchRequest,
     TPPositionRequest,
 )
+import asyncio
+from utils.websocket_manager import manager
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -79,6 +82,56 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+async def price_pusher_task():
+    """Tarea en segundo plano que actualiza precios cada 2 segundos para pares activos"""
+    print(">>> Iniciando Price Pusher Task...")
+    while True:
+        try:
+            # Obtener lista única de todos los símbolos suscritos
+            all_subs = set()
+            for subs in manager.subscriptions.values():
+                all_subs.update(subs)
+            
+            if all_subs:
+                client = get_market_client()
+                for symbol in all_subs:
+                    if symbol == "ALL": continue
+                    # Usamos to_thread para no bloquear el loop de asyncio con CCXT (que es síncrono aquí)
+                    ticker = await asyncio.to_thread(client.get_ticker, symbol)
+                    if ticker and "error" not in ticker:
+                        await manager.broadcast_to_subscribers(symbol, ticker)
+            
+            await asyncio.sleep(2)  # Intervalo de actualización
+        except Exception as e:
+            print(f">>> Error in price pusher task: {e}")
+            await asyncio.sleep(5)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(price_pusher_task())
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message.get("type") == "subscribe":
+                symbols = message.get("symbols", [])
+                await manager.subscribe(websocket, symbols)
+                
+            elif message.get("type") == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                
+    except Exception as e:
+        print(f">>> WebSocket error: {e}")
+    finally:
+        manager.disconnect(websocket)
 
 
 @app.get("/")
@@ -353,6 +406,28 @@ async def get_pnl_stats(req: CredentialsRequest):
         raise HTTPException(status_code=400, detail=stats["error"])
 
     return convert_numpy_types(stats)
+
+@app.post("/trading-history")
+async def get_trading_history(req: CredentialsRequest):
+    """Obtiene historial persistente y sincroniza nuevos trades desde CoinEx"""
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    
+    # 1. Obtener trades actuales del exchange
+    stats_data = client.get_realized_pnl_fast()
+    
+    if stats_data and "history" in stats_data:
+        # 2. Guardar trades nuevos en persistencia local
+        HistoryManager.save_trades(stats_data["history"])
+    
+    # 3. Obtener historial completo y estadísticas agregadas
+    full_history = HistoryManager.get_history()
+    aggregated_stats = HistoryManager.get_stats()
+    
+    return {
+        "stats": aggregated_stats,
+        "recent_exchange_pnl": stats_data,
+        "history": full_history[:50] # Limitamos a los últimos 50 para la vista principal
+    }
 
 @app.post("/check-position")
 async def check_position(req: CredentialsRequest, market: str):

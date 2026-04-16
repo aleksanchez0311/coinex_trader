@@ -12,8 +12,10 @@ import ConfirmOrderModal from './components/modals/ConfirmOrderModal';
 import StrategyView from './components/StrategyView';
 import RiskManagementView from './components/RiskManagementView';
 import PositionsTable from './components/PositionsTable';
+import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
 import { BalanceProvider, useBalance } from './contexts/BalanceContext';
+import { useWebSocket } from './hooks/useWebSocket';
 import API_URL from './config/api';
 
 const AppContent = ({ exchangeBalance, balanceLoading, balanceError, refetchBalance, credentials, setCredentials }) => {
@@ -47,6 +49,26 @@ const AppContent = ({ exchangeBalance, balanceLoading, balanceError, refetchBala
   const [entryPrice, setEntryPrice] = useState(null);
   const [riskAmount, setRiskAmount] = useState(7);
   const [currentTradeSide, setCurrentTradeSide] = useState(null);
+
+  // WebSocket para actualizaciones en tiempo real
+  const { lastTicker } = useWebSocket([selectedSymbol]);
+
+  // Actualizar precio en tiempo real cuando llega un ticker
+  useEffect(() => {
+    if (lastTicker && lastTicker.symbol === selectedSymbol.replace(':USDT', '').replace('-USDT', '')) {
+      setAnalysisData(prev => {
+        if (!prev || !prev.analysis) return prev;
+        return {
+          ...prev,
+          analysis: {
+            ...prev.analysis,
+            last_price: lastTicker.last,
+            trend_detail: lastTicker.up ? 'Alcista' : 'Bajista'
+          }
+        };
+      });
+    }
+  }, [lastTicker, selectedSymbol]);
 
   const fetchPnlStats = async () => {
     if (!credentials.apiKey || !credentials.apiSecret) {
@@ -465,6 +487,13 @@ const AppContent = ({ exchangeBalance, balanceLoading, balanceError, refetchBala
           {activeTab === 'positions' && (
             <div className="w-full">
               <PositionsTable 
+                credentials={credentials}
+              />
+            </div>
+          )}
+          {activeTab === 'history' && (
+            <div className="w-full">
+              <HistoryView 
                 credentials={credentials}
               />
             </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, TrendingUp, ShieldAlert, Settings, Layers, X } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, ShieldAlert, Settings, Layers, X, History } from 'lucide-react';
 
 const Sidebar = ({ 
   activeTab, setActiveTab, selected, isOpen = true, onClose
@@ -7,6 +7,7 @@ const Sidebar = ({
   const items = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'positions', icon: Layers, label: 'Posiciones' },
+    { id: 'history', icon: History, label: 'Historial' },
     { id: 'strategy', icon: TrendingUp, label: 'Estrategias' },
     { id: 'risk', icon: ShieldAlert, label: 'Gestión de Riesgo' },
     { id: 'settings', icon: Settings, label: 'Configuración' },

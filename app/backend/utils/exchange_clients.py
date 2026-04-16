@@ -274,6 +274,11 @@ class MarketDataClient:
         result["notes"].append(
             "La app prioriza datos en tiempo real de OKX/CoinGecko/CoinEx cuando la fuente responde."
         )
+        
+        # Inyectar tendencia de OI basada en datos recientes (Placeholder lógico)
+        # En una versión futura esto compararía con valores históricos guardados
+        result["oi_trend"] = "increasing" if result.get("spot", {}).get("change_24h_pct", 0) > 0 else "decreasing"
+        
         return result
 
     def get_all_markets(self, verified_only: bool = False) -> List[Dict]:

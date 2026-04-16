@@ -79,18 +79,20 @@ class AnalysisEngine:
 
         last_5 = swing_types[-5:]
 
-        if last_5.count("HH") >= 2 and last_5.count("HL") >= 1:
+        if (last_5.count("HH") >= 2 and last_5.count("HL") >= 1) or (last_5.count("HH") >= 1 and last_5.count("HL") >= 1 and self.df["close"].iloc[-1] > self.df["ema_20"].iloc[-1] if "ema_20" in self.df else True):
             trend = "Alcista"
             if len(swings) >= 2:
                 last_idx = swings[-1]["index"]
                 prev_idx = swings[-2]["index"]
+                # BOS alcista: cierre por encima del máximo anterior
                 if self.df["close"].iloc[-1] > self.df["high"].iloc[prev_idx]:
                     bos = {"type": "Alcista", "index": last_idx, "valid": True}
-        elif last_5.count("LL") >= 2 and last_5.count("LH") >= 1:
+        elif (last_5.count("LL") >= 2 and last_5.count("LH") >= 1) or (last_5.count("LL") >= 1 and last_5.count("LH") >= 1 and self.df["close"].iloc[-1] < self.df["ema_20"].iloc[-1] if "ema_20" in self.df else True):
             trend = "Bajista"
             if len(swings) >= 2:
                 last_idx = swings[-1]["index"]
                 prev_idx = swings[-2]["index"]
+                # BOS bajista: cierre por debajo del mínimo anterior
                 if self.df["close"].iloc[-1] < self.df["low"].iloc[prev_idx]:
                     bos = {"type": "Bajista", "index": last_idx, "valid": True}
 
@@ -679,7 +681,7 @@ class AnalysisEngine:
             "liquidez_presente": len(liquidity["highs"]) > 0
             or len(liquidity["lows"]) > 0,
             "ob_fvg_presente": len(obs) > 0 or len(fvgs) > 0,
-            "rsi_en_zona": 40 < rsi < 60,
+            "rsi_en_zona": (40 < rsi < 60) if bias == "Alcista" else (30 < rsi < 55) if bias == "Bajista" else (40 < rsi < 60),
             "volumen_ok": volume["signal"] in ["Alto", "Normal"],
         }
 
