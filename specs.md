@@ -268,7 +268,6 @@ Genera `CoinExTrader.exe` + `favicon.ico`
 - **Mercados**: Solo futuros perpetuos CoinEx
 - **Órdenes**: Sin soporte OCO, sin trailing stop
 - **Multiplataforma**: Launcher solo Windows, APK solo Android
-- **CORS**: Permitido para cualquier origen (desarrollo)
 - **Offline**: Funcionalidad limitada sin conexión
 - **iOS**: No disponible (solo Android)
 - **Linux/macOS**: Launcher solo Windows
@@ -279,6 +278,22 @@ Genera `CoinExTrader.exe` + `favicon.ico`
 - **Android SDK 35**: Soporte para Android 14+
 - **Java 22**: Compilación con JDK más reciente
 - **Build Tools 35.0.0**: Herramientas de build actualizadas
+- **Header UI**: Widget balance y PnL centrados en navbar
+- **Backend Fixes**: Lazy loading para MarketDataClient y corrección de UnboundLocalError
+- **Vercel Deploy**: Configuración completa para producción
+- **CORS Production**: Configurado para dominios Vercel
+
+### Estado Actual del Deploy
+- **Frontend Vercel**: ✅ https://coinex-trader.vercel.app
+- **Backend Vercel**: ✅ https://coinex-trader-backend.vercel.app
+- **Windows Exe**: ✅ CoinExTrader.exe
+- **Android APK**: ✅ CoinEx Trader-release.apk
+
+### Bugs Recientes Solucionados
+- **Backend Initialization**: MarketDataClient lazy loading
+- **Analysis Engine**: UnboundLocalError en support/resistance
+- **CORS Production**: Dominios Vercel configurados
+- **Frontend Connection**: Variables de entorno corregidas
 
 ### Mejoras Planeadas
 - **Paper Trading**: Modo simulación

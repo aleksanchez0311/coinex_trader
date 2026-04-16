@@ -26,19 +26,21 @@ Plataforma fullstack profesional para análisis y ejecución de trading intradí
 - **Glassmorphism**: Modales con efecto blur y transparencia
 - **Responsive**: Adaptable a desktop y móvil
 - **Actualización por Foco**: Datos se actualizan automáticamente cuando la app gana foco
+- **Header Centrado**: Widget de balance y PnL acumulado centrados en el navbar
 
 ### Multiplataforma
 - **Windows**: Ejecutable nativo (.exe) con launcher C#
 - **Android**: APK nativo con Capacitor
-- **Web**: Aplicación web progresiva (PWA)
+- **Web**: Aplicación web progresiva (PWA) desplegada en Vercel
+  - Frontend: https://coinex-trader.vercel.app
+  - Backend: https://coinex-trader-backend.vercel.app
 
-## 📋 Requisitos del Sistema
+## Requisitos del Sistema
 
 - Python 3.9+ (backend)
 - Node.js 18+ (frontend)
-- Navegador moderno con soporte localStorage
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 trader/
@@ -63,7 +65,7 @@ trader/
 │       │   ├── components/       # Componentes UI
 │       │   │   ├── ActionButtons.jsx     # Botones Plan & Info
 │       │   │   ├── AnalysisBoard.jsx      # Display análisis
-│       │   │   ├── Header.jsx            # Header + logo + PnL
+│       │   │   ├── Header.jsx            # Header + logo + PnL (centrado)
 │       │   │   ├── MarketList.jsx        # Lista favoritos
 │       │   │   ├── PositionsTable.jsx   # Posiciones abiertas
 │       │   │   ├── Sidebar.jsx          # Navegación (colapsable)
@@ -95,15 +97,15 @@ trader/
 │   ├── requirements.txt        # Dependencias launcher
 │   ├── CoinEx Trader-release.apk # APK Android firmado
 │   └── edge-function/          # Funciones edge (futuro)
+├── app/backend/vercel.json     # Configuración despliegue Vercel backend
+├── app/frontend/vercel.json     # Configuración despliegue Vercel frontend
 ├── CoinExTrader.exe              # Ejecutable compilado
 ├── favicon.ico                   # Icono de la aplicación
 ├── .env.example                  # Variables de entorno ejemplo
 ├── AGENTS.md                     # Configuración de agentes IA
 ├── specs.md                      # Especificaciones técnicas
-└── README.md                     # Este archivo
-```
 
-## 🛠️ Instalación
+## Instalación
 
 ### Backend
 
@@ -157,7 +159,7 @@ Dependencias:
 - autoprefixer
 - postcss
 
-## ⚙️ Configuración
+## Configuración
 
 ### Variables de Entorno (Backend)
 
@@ -176,7 +178,7 @@ Las credenciales configuradas en la página de **Configuración** tienen priorid
 - **Guardar Credenciales**: Guarda las credenciales actualizadas en localStorage
 - **Borrar Credenciales**: Elimina las credenciales guardadas
 
-## 🎯 Flujo de Operación
+## Flujo de Operación
 
 1. **Seleccionar símbolo** de la lista de favoritos
 2. **Análisis automático** del par (estructura SMC, indicadores)
@@ -185,18 +187,18 @@ Las credenciales configuradas en la página de **Configuración** tienen priorid
 5. **Abrir operación** → modal de confirmación con todos los parámetros
 6. **Confirmar** → ejecutar orden real en CoinEx
 
-## 📊 Checks Pre-Trade (Checklist ORO)
+## Checks Pre-Trade (Checklist ORO)
 
-1. ✓ Tendencia EMA alineada
-2. ✓ Estructura BOS confirmada
-3. ✓ Zonas de liquidez identificadas
-4. ✓ OB/FVG válido detectado
-5. ✓ RSI en zona correcta (40-60)
-6. ✓ Volumen confirmado
+1. Tendencia EMA alineada
+2. Estructura BOS confirmada
+3. Zonas de liquidez identificadas
+4. OB/FVG válido detectado
+5. RSI en zona correcta (40-60)
+6. Volumen confirmado
 
 **Si falta 1 → NO OPERAR**
 
-## 🧠 Metodología
+## Metodología
 
 La estrategia combina:
 
@@ -206,7 +208,7 @@ La estrategia combina:
 - **ATR**: Stop Loss basado en volatilidad
 - **Volumen**: Validación de movimientos
 
-## 📈 Endpoints API
+## Endpoints API
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
@@ -224,80 +226,28 @@ La estrategia combina:
 | `/tickers` | POST | Precio de múltiples símbolos (batch) |
 | `/market-status` | GET | Estado de conexión y pares activos |
 
-## ð¦ Android APK (Capacitor)
+## Estado Actual del Proyecto
 
-### Compilar APK
+### Funcionalidades Completas
+- **Análisis SMC** automatizado con detección de estructura
+- **Integración CoinEx** para trading real
+- **Gestión de riesgo** con TP múltiples
+- **UI Premium** con header centrado
+- **Despliegue Vercel** funcional (frontend + backend)
+- **Multiplataforma** (Windows, Android, Web)
 
-```cmd
-cd release
-apkify.bat --default
-```
+### Issues Recientes Solucionados
+- **Backend Initialization Error**: Fixed lazy loading para MarketDataClient
+- **UnboundLocalError**: Fixed support/resistance calculation order
+- **CORS Production**: Configurado para dominios Vercel
+- **Frontend-Backend Connection**: Variables de entorno corregidas
 
-O para firmar APK existente:
-```cmd
-cd release
-apkify.bat --sign-only
-```
+### Deploy Status
+- **Frontend**: https://coinex-trader.vercel.app
+- **Backend**: https://coinex-trader-backend.vercel.app
+- **Windows**: CoinExTrader.exe
+- **Android**: CoinEx Trader-release.apk
 
-### Requisitos previos
-
-1. **Java 22+** (Eclipse Adoptium JDK)
-2. **Android SDK** (API Level 35+)
-3. **Node.js 18+**
-4. **Gradle 8.10.2+**
-
-### Configuración
-
-El script `apkify.bat` configura automáticamente:
-- **Capacitor 7**: Framework para apps nativas
-- **Android Studio**: Build y debugging
-- **Keystore**: Firma digital del APK (keystore auto-generado)
-- **Package ID**: `cu.limitlesscode.coinextraderandroid`
-- **Permisos**: Cámara (para QR code scanning)
-- **Build Tools**: Android SDK Build Tools 35.0.0
-
-### Características Android
-
-- **Nativo**: Performance nativa con WebView
-- **Offline**: Funciona sin conexión (datos cacheados)
-- **Notificaciones**: Alertas de trading push
-- **Responsive**: UI adaptada a móviles
-- **QR Scanner**: Integración con html5-qrcode para escanear API keys
-- **Capacitor 7**: Última versión del framework híbrido
-- **Java 22**: Compilación con JDK más reciente
-- **Target SDK 35**: Compatible con Android 14+
-
-## ðª Componentes UI
-
-### Componentes Principales
-- **App.jsx**: Estado global, modales, control de sidebar
-- **MarketList.jsx**: Lista de mercados favoritos con precios en tiempo real
-- **AnalysisBoard.jsx**: Display de análisis técnico y scoring
-- **PositionsTable.jsx**: Tabla de posiciones abiertas con PnL
-- **RiskPanel.jsx**: Panel avanzado de gestión de riesgo
-- **SettingsView.jsx**: Configuración de API y mercados favoritos
-
-### Componentes Modales
-- **PlanOperativoModal.jsx**: Modal glassmorphism con plan completo (sesgo, escenarios, entry/SL/TP, R:R)
-- **InfoAvanzadaModal.jsx**: Modal técnico con análisis SMC, indicadores, niveles clave
-- **ConfirmOrderModal.jsx**: Modal confirmación con cálculo margen, riesgo, modo orden
-
-### Sistema de Diseño
-
-#### Paleta de Colores (Dark Mode Premium)
-| Elemento | Color |
-|----------|-------|
-| Background (Eerie Black) | `#0B0E11` |
-| Surface (Gunmetal) | `#1E2329` |
-| Long (Emerald Green) | `#00C076` |
-| Short (Candy Apple Red) | `#CF304A` |
-| Neutral/NO TRADE | `#848E9C` |
-| Text Primary | `#EAECEF` |
-
-#### Tipografía
-- **UI/Text**: Inter o Geist Sans
-- **Prices/Data**: Roboto Mono o JetBrains Mono (previene jitter visual)
-
-## ⚠️ Disclaimer
+## Disclaimer
 
 Esta herramienta es experimental. El trading de futuros conlleva un riesgo significativo. Úsese bajo su propia responsabilidad.
