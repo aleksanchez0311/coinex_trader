@@ -415,7 +415,7 @@ class TradingClient:
         margin_mode: str = "isolated",
         order_type: str = "limit",
     ) -> Dict:
-        """Crea una orden con SL y TP automáticos en modo aislado."""
+        """Crea orden y luego configura SL/TP en CoinEx Futures por separado."""
         if ":" not in symbol:
             symbol = f"{symbol}:{symbol.split('/')[-1]}"
 
@@ -436,27 +436,10 @@ class TradingClient:
 
             self.set_leverage(symbol, leverage, margin_mode)
 
-            params = {}
-
-            if stop_loss:
-                if side == "buy":
-                    params["stop_loss_price"] = stop_loss
-                    params["stop_loss_type"] = "down"
-                else:
-                    params["stop_loss_price"] = stop_loss
-                    params["stop_loss_type"] = "up"
-
-            if take_profit:
-                if side == "buy":
-                    params["take_profit_price"] = take_profit
-                    params["take_profit_type"] = "up"
-                else:
-                    params["take_profit_price"] = take_profit
-                    params["take_profit_type"] = "down"
-
+            order_params = {}
             if order_type == "market" or not entry_price:
                 order = self.client.create_market_order(
-                    symbol=symbol, side=side, amount=amount, params=params
+                    symbol=symbol, side=side, amount=amount, params=order_params
                 )
             else:
                 order = self.client.create_limit_order(
@@ -464,10 +447,72 @@ class TradingClient:
                     side=side,
                     amount=amount,
                     price=entry_price,
-                    params=params,
+                    params=order_params,
                 )
 
-            return order
+            protective = {"stop_loss": None, "take_profit": None, "warnings": []}
+            trigger_type = "latest_price"
+
+            # CoinEx/CCXT no aplica SL+TP juntos en una sola llamada.
+            # Se colocan por separado contra la posicion abierta.
+            if stop_loss:
+                try:
+                    sl_resp = self.client.create_order(
+                        symbol=symbol,
+                        type="market",
+                        side=side,
+                        amount=amount,
+                        params={
+                            "stopLossPrice": float(stop_loss),
+                            "stop_type": trigger_type,
+                        },
+                    )
+                    protective["stop_loss"] = {
+                        "requested": float(stop_loss),
+                        "status": "set",
+                        "exchange_response": sl_resp,
+                    }
+                except Exception as e:
+                    protective["stop_loss"] = {
+                        "requested": float(stop_loss),
+                        "status": "error",
+                        "error": str(e),
+                    }
+                    protective["warnings"].append(
+                        "No se pudo establecer Stop Loss. Si la orden no abre posicion aun (ej. limit pendiente), reintentar tras fill."
+                    )
+
+            if take_profit:
+                try:
+                    tp_resp = self.client.create_order(
+                        symbol=symbol,
+                        type="market",
+                        side=side,
+                        amount=amount,
+                        params={
+                            "takeProfitPrice": float(take_profit),
+                            "stop_type": trigger_type,
+                        },
+                    )
+                    protective["take_profit"] = {
+                        "requested": float(take_profit),
+                        "status": "set",
+                        "exchange_response": tp_resp,
+                    }
+                except Exception as e:
+                    protective["take_profit"] = {
+                        "requested": float(take_profit),
+                        "status": "error",
+                        "error": str(e),
+                    }
+                    protective["warnings"].append(
+                        "No se pudo establecer Take Profit. Si la orden no abre posicion aun (ej. limit pendiente), reintentar tras fill."
+                    )
+
+            return {
+                "order": order,
+                "protective_orders": protective,
+            }
 
         except Exception as e:
             return {"error": str(e)}
@@ -514,9 +559,24 @@ class TradingClient:
             return {"error": str(e)}
 
     def get_balance(self):
-        """Obtiene el balance real de la cuenta swap"""
+        """Obtiene balance de CoinEx y resume el saldo principal de futuros."""
         try:
-            return self.client.fetch_balance()
+            balance = self.client.fetch_balance()
+            total = balance.get("total", {})
+            free = balance.get("free", {})
+            used = balance.get("used", {})
+            usdt_total = float(total.get("USDT", 0) or 0)
+            usdt_free = float(free.get("USDT", 0) or 0)
+            usdt_used = float(used.get("USDT", 0) or 0)
+            return {
+                "exchange": "coinex",
+                "account_type": "swap",
+                "currency": "USDT",
+                "usdt_total": round(usdt_total, 8),
+                "usdt_free": round(usdt_free, 8),
+                "usdt_used": round(usdt_used, 8),
+                "raw": balance,
+            }
         except Exception as e:
             return {"error": str(e)}
 
