@@ -29,7 +29,13 @@ app = FastAPI(title="CoinEx Trader API")
 ohlcv_cache: Dict[str, tuple] = {}
 derivatives_cache: Dict[str, tuple] = {}
 CACHE_TTL = 30
-market_client = MarketDataClient()
+market_client = None
+
+def get_market_client():
+    global market_client
+    if market_client is None:
+        market_client = MarketDataClient()
+    return market_client
 
 
 @app.exception_handler(RequestValidationError)
@@ -70,20 +76,23 @@ async def analyze_pair(req: AnalysisRequest):
         if current_time - cached_time < CACHE_TTL:
             ohlcv = cached_ohlcv
         else:
-            ohlcv = market_client.get_ohlcv(symbol, req.timeframe)
+            client = get_market_client()
+            ohlcv = client.get_ohlcv(symbol, req.timeframe)
             if not isinstance(ohlcv, dict) or "error" not in ohlcv:
                 ohlcv_cache[cache_key] = (current_time, ohlcv)
     else:
-        ohlcv = market_client.get_ohlcv(symbol, req.timeframe)
+        client = get_market_client()
+        ohlcv = client.get_ohlcv(symbol, req.timeframe)
         if not isinstance(ohlcv, dict) or "error" not in ohlcv:
             ohlcv_cache[cache_key] = (current_time, ohlcv)
 
     if isinstance(ohlcv, dict) and "error" in ohlcv:
         raise HTTPException(status_code=400, detail=ohlcv["error"])
 
-    derivatives = market_client.get_derivatives_data(symbol)
-    ticker = market_client.get_ticker(symbol)
-    market_context = market_client.get_market_context(symbol)
+    client = get_market_client()
+    derivatives = client.get_derivatives_data(symbol)
+    ticker = client.get_ticker(symbol)
+    market_context = client.get_market_context(symbol)
     derivatives_cache_key = f"derivatives:{symbol}"
     derivatives_cache[derivatives_cache_key] = (current_time, derivatives)
 
@@ -402,7 +411,8 @@ async def get_top_gainers_endpoint(
 @app.get("/ticker/{symbol}")
 async def get_ticker(symbol: str):
     """Obtiene precio actual y cambio 24h de un símbolo"""
-    ticker = market_client.get_ticker(symbol)
+    client = get_market_client()
+    ticker = client.get_ticker(symbol)
 
     if isinstance(ticker, dict) and "error" in ticker:
         raise HTTPException(status_code=400, detail=ticker["error"])
@@ -415,7 +425,8 @@ async def get_tickers_batch(req: TickersBatchRequest):
     """Obtiene precios de múltiples símbolos"""
     results = {}
     for symbol in req.symbols:
-        ticker = market_client.get_ticker(symbol)
+        client = get_market_client()
+        ticker = client.get_ticker(symbol)
         if "error" not in ticker:
             results[symbol] = ticker
 
@@ -428,7 +439,8 @@ async def get_status():
     market_ok = False
     coinex_ok = False
     try:
-        ticker = market_client.get_ticker("BTC/USDT")
+        client = get_market_client()
+        ticker = client.get_ticker("BTC/USDT")
         market_ok = not (isinstance(ticker, dict) and "error" in ticker)
     except Exception:
         market_ok = False
