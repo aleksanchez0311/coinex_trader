@@ -61,7 +61,7 @@ const AnalysisBoard = ({ symbol, data, loading, analysisStep, onAnalyze, hasAnal
           <span className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2 hidden md:inline">Setup Quality Score</span>
           <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2 md:hidden">Score</span>
           <div className="relative">
-            <svg className="w-24 h-24 md:w-32 md:h-32 transform -rotate-90">
+            <svg className="w-24 h-24 md:w-32 md:h-32 transform -rotate-90" viewBox="0 0 128 128">
               <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/5" />
               <circle 
                 cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 

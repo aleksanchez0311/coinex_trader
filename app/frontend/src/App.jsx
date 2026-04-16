@@ -489,6 +489,10 @@ const AppContent = ({ exchangeBalance, balanceLoading, balanceError, refetchBala
           tradingPlan={currentTradingPlan}
           symbol={selectedSymbol}
           onOpenTrade={handleOpenTrade}
+          onOpenAdvanced={() => {
+            setShowPlanModal(false);
+            setShowAdvancedModal(true);
+          }}
         />
 
         <InfoAvanzadaModal 

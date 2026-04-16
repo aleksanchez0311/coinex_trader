@@ -1168,6 +1168,88 @@ class TradingClient:
         """Obtiene PnL realizado de CoinEx"""
         return self.get_realized_pnl_fast()
 
+    def get_open_orders_fast(self) -> List[Dict]:
+        """Obtiene órdenes pendientes de forma optimizada con cache"""
+        cache_key = "open_orders"
+        
+        if self._is_cache_valid(cache_key):
+            print(">>> Using cached open orders")
+            return self._cache[cache_key]["data"]
+        
+        try:
+            print(">>> Fetching open orders from CoinEx API...")
+            
+            # Incrementar contador para rate limiting
+            self._request_counters["orders"] = self._request_counters.get("orders", 0) + 1
+            delay = self._get_optimal_delay("orders")
+            if delay > 0:
+                time.sleep(delay)
+            
+            # Obtener todas las órdenes abiertas
+            open_orders = self.client.fetch_open_orders()
+            
+            # Procesar y normalizar los datos
+            processed_orders = []
+            for order in open_orders:
+                processed_order = {
+                    "id": order.get("id"),
+                    "symbol": order.get("symbol"),
+                    "side": order.get("side"),
+                    "type": order.get("type"),
+                    "amount": float(order.get("amount", 0)),
+                    "filled": float(order.get("filled", 0)),
+                    "remaining": float(order.get("remaining", 0)),
+                    "price": float(order.get("price", 0)) if order.get("price") else None,
+                    "average": float(order.get("average", 0)) if order.get("average") else None,
+                    "status": order.get("status"),
+                    "timestamp": order.get("timestamp"),
+                    "datetime": order.get("datetime"),
+                    "info": order.get("info", {})
+                }
+                processed_orders.append(processed_order)
+            
+            # Cache por 15 segundos (las órdenes cambian frecuentemente)
+            self._cache[cache_key] = {
+                "data": processed_orders,
+                "timestamp": time.time(),
+                "ttl": 15
+            }
+            
+            return processed_orders
+            
+        except Exception as e:
+            print(f">>> Error fetching open orders: {str(e)}")
+            return []
+
+    def cancel_order(self, order_id: str, symbol: str) -> Dict:
+        """Cancela una orden pendiente"""
+        try:
+            print(f">>> Canceling order {order_id} for {symbol}...")
+            
+            # Usar el método cancel_order de ccxt
+            result = self.client.cancel_order(order_id, symbol)
+            
+            if result:
+                print(f">>> Order {order_id} canceled successfully")
+                return {
+                    "success": True,
+                    "order_id": order_id,
+                    "symbol": symbol,
+                    "message": "Orden cancelada exitosamente"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "No se pudo cancelar la orden"
+                }
+                
+        except Exception as e:
+            print(f">>> Error canceling order: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def get_positions(self):
         """Obtiene las posiciones abiertas reales"""
         try:

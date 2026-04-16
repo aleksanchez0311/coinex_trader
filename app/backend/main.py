@@ -271,6 +271,40 @@ async def get_positions(req: CredentialsRequest):
     return positions
 
 
+@app.post("/open-orders")
+async def get_open_orders(req: CredentialsRequest):
+    """Obtiene las órdenes pendientes"""
+    client = TradingClient(api_key=req.api_key, secret=req.secret)
+    orders = client.get_open_orders_fast()
+
+    if isinstance(orders, dict) and "error" in orders:
+        raise HTTPException(status_code=400, detail=orders["error"])
+
+    return orders
+
+
+@app.post("/cancel-order")
+async def cancel_order(req: dict):
+    """Cancela una orden pendiente"""
+    try:
+        order_id = req.get("order_id")
+        symbol = req.get("symbol")
+        
+        if not order_id or not symbol:
+            raise HTTPException(status_code=400, detail="order_id y symbol son requeridos")
+        
+        client = TradingClient(api_key=req.get("api_key"), secret=req.get("secret"))
+        result = client.cancel_order(order_id, symbol)
+        
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/close-position")
 async def close_position(req: ClosePositionRequest):
     """Cierra una posición abierta"""
