@@ -1,130 +1,111 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Clock, RefreshCw, Zap } from 'lucide-react';
+import { Search, Star, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import API_URL from '../config/api';
 
 const MarketList = ({ selected, setSelected, onSymbolSelect }) => {
-  const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('trader_favorites');
-    const defaultSymbols = saved ? JSON.parse(saved) : [];
-    return defaultSymbols.map(sym => ({ symbol: sym, price: null, change: null, up: true }));
-  });
+  const [favorites, setFavorites] = useState([]);
+  const [marketData, setMarketData] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  const loadFavs = () => {
+    const saved = localStorage.getItem('trader_favorites');
+    if (saved) setFavorites(JSON.parse(saved));
+  };
 
-  useEffect(() => {
-    const updateFavoritesFromStorage = () => {
-      const saved = localStorage.getItem('trader_favorites');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setFavorites(current => {
-          return parsed.map(sym => {
-            const existing = current.find(f => f.symbol === sym);
-            return existing || { symbol: sym, price: null, change: null, up: true };
-          });
-        });
-        setTimeout(() => window.dispatchEvent(new Event('reload_prices_now')), 100);
-      }
-    };
-
-    window.addEventListener('favorites_updated', updateFavoritesFromStorage);
-    return () => window.removeEventListener('favorites_updated', updateFavoritesFromStorage);
-  }, []);
-
-  const loadPrices = async () => {
-    const symbols = favorites.map(f => f.symbol);
-    if(symbols.length === 0) return;
-    setLoading(true);
+  const fetchTickers = async () => {
+    if (favorites.length === 0) return;
     try {
-      const response = await fetch(`${API_URL}/tickers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbols })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setFavorites(prev => prev.map(fav => {
-          const ticker = data[fav.symbol];
-          if (ticker) {
-            return {
-              ...fav,
-              price: ticker.last,
-              change: ticker.percentage,
-              up: ticker.up
-            };
-          }
-          return fav;
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching tickers:", error);
-    } finally {
-      setLoading(false);
+      const response = await fetch(`${API_URL}/tickers?symbols=${favorites.join(',')}`);
+      const data = await response.json();
+      setMarketData(prev => ({ ...prev, ...data }));
+    } catch (e) {
+      console.error("Error fetching list tickers:", e);
     }
   };
 
   useEffect(() => {
-    loadPrices();
-    const handleVisibilityChange = () => { if (!document.hidden) loadPrices(); };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('reload_prices_now', loadPrices);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('reload_prices_now', loadPrices);
-    };
-  }, [favorites.length]);
+    loadFavs();
+    window.addEventListener('favorites_updated', loadFavs);
+    return () => window.removeEventListener('favorites_updated', loadFavs);
+  }, []);
 
-  const handleSelect = (symbol) => {
-    setSelected(symbol);
-    if (onSymbolSelect) onSymbolSelect(symbol);
-  };
-
-  const formatPrice = (price) => {
-    if (!price) return '---';
-    if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    if (price >= 1) return price.toFixed(2);
-    return price.toFixed(4);
-  };
+  useEffect(() => {
+    if (favorites.length > 0) {
+      fetchTickers();
+      const interval = setInterval(fetchTickers, 10000); // Polling cada 10s para la lista secundaria
+      return () => clearInterval(interval);
+    }
+  }, [favorites]);
 
   return (
-    <div className="glass p-5 space-y-5 rounded-[2rem]">
-      <div className="flex items-center justify-between px-1">
-        <h3 className="font-black flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-gray-500">
-          <Zap size={14} className="text-accent" fill="currentColor" /> Watchlist
-        </h3>
-        <button 
-          onClick={loadPrices}
-          disabled={loading}
-          className="p-2 hover:bg-white/5 rounded-full transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin text-accent" : "text-gray-500"} />
-        </button>
-      </div>
-
-      <div className="space-y-2 overflow-y-auto max-h-[350px] pr-1 custom-scrollbar">
-        {favorites.map((pair) => (
-          <div
-            key={pair.symbol}
-            onClick={() => handleSelect(pair.symbol)}
-            className={`p-4 rounded-2xl cursor-pointer transition-all border ${
-              selected === pair.symbol 
-                ? 'bg-accent/10 border-accent/20 ring-1 ring-accent/10' 
-                : 'bg-white/5 border-transparent hover:bg-white/10'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-black uppercase tracking-widest ${selected === pair.symbol ? 'text-white' : 'text-gray-400'}`}>
-                {pair.symbol}
-              </span>
-              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${pair.up ? 'bg-long/10 text-long' : 'bg-short/10 text-short'}`}>
-                {pair.change >= 0 ? '+' : ''}{pair.change?.toFixed(1) || '0.0'}%
-              </span>
+    <div className="glass p-6 md:p-8 rounded-[2.5rem] border-white/5 flex flex-col h-full bg-gradient-to-br from-white/5 to-transparent min-h-[500px]">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-accent/10 rounded-2xl ring-1 ring-accent/20">
+              <Star size={18} className="text-accent" fill="currentColor" />
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-mono font-bold text-white tabular-nums">${formatPrice(pair.price)}</span>
-              {pair.up ? <TrendingUp size={16} className="text-long" /> : <TrendingDown size={16} className="text-short" />}
+            <div>
+              <h3 className="font-black text-[10px] text-white uppercase tracking-[0.3em]">Watchlist</h3>
+              <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Live Stream</p>
             </div>
           </div>
-        ))}
-      </div>
+          <span className="text-[10px] font-mono font-bold text-accent bg-accent/5 px-2 py-1 rounded-lg border border-accent/10">{favorites.length} Pares</span>
+        </div>
+
+        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+          {favorites.map((symbol) => {
+            const data = marketData[symbol] || {};
+            const isUp = data.percentage >= 0;
+            
+            return (
+              <button
+                key={symbol}
+                onClick={() => onSymbolSelect(symbol)}
+                className={`w-full group relative flex items-center justify-between p-5 rounded-[2rem] transition-all duration-300 border ${
+                  selected === symbol 
+                  ? 'bg-white/10 border-white/20 shadow-2xl shadow-black/40 scale-[1.02]' 
+                  : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/5'
+                }`}
+              >
+                <div className="flex flex-col items-start min-w-0">
+                  <span className={`text-sm font-black tracking-tighter transition-colors ${selected === symbol ? 'text-accent' : 'text-white'}`}>
+                    {symbol}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                     <span className={`text-[10px] font-black uppercase tracking-widest ${isUp ? 'text-long' : 'text-short'}`}>
+                        {isUp ? '+' : ''}{data.percentage?.toFixed(2) || '0.00'}%
+                     </span>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <span className="text-sm font-mono font-bold text-white block tracking-tighter">
+                    ${data.last?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) || '0.00'}
+                  </span>
+                  <div className="flex items-center justify-end gap-1 mt-1 opacity-40">
+                    <Activity size={10} className={isUp ? 'text-long' : 'text-short'} />
+                    <span className="text-[8px] font-black uppercase tracking-tighter">Verified</span>
+                  </div>
+                </div>
+
+                {selected === symbol && (
+                  <div className="absolute left-0 w-1.5 h-10 bg-accent rounded-full -translate-x-1.5" />
+                )}
+              </button>
+            );
+          })}
+
+          {favorites.length === 0 && (
+            <div className="py-24 text-center">
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 opacity-20">
+                <Search size={32} />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600 leading-relaxed">
+                Tu lista está vacía.<br/>Configura favoritos en ajustes.
+              </p>
+            </div>
+          )}
+        </div>
     </div>
   );
 };
