@@ -122,6 +122,47 @@ async def price_pusher_task():
 
 
 
+@app.get("/discover-markets")
+async def discover_markets(verified_only: bool = True):
+    """
+    Descubrimiento avanzado: CoinEx (Ejecución) <-> OKX (Análisis)
+    Devuelve listas organizadas por Volumen, Precio y Ganadores.
+    """
+    try:
+        # 1. Obtener mercados de CoinEx (FUTUROS)
+        coinex_markets_raw = trading_client.client.load_markets()
+        coinex_symbols = {
+            s.replace("/USDT", "").replace(":USDT", "") 
+            for s in coinex_markets_raw.keys() 
+            if "/USDT" in s and coinex_markets_raw[s].get("active")
+        }
+
+        # 2. Obtener tickers de OKX (para datos de volumen/precio/cambio)
+        okx_tickers = market_client.get_top_markets(limit=200, sort_by="volume") # Traemos bastantes para cruzar
+        
+        # 3. Cruce y organización
+        verified_list = []
+        for okx_m in okx_tickers:
+            base = okx_m["base"]
+            # Si el activo existe en CoinEx, es un par verificado
+            if base in coinex_symbols:
+                verified_list.append(okx_m)
+
+        # 4. Crear las 3 categorías
+        by_volume = sorted(verified_list, key=lambda x: x["volume"], reverse=True)
+        by_price = sorted(verified_list, key=lambda x: x["last"], reverse=True)
+        by_gainers = sorted(verified_list, key=lambda x: x["percentage"], reverse=True)
+
+        return {
+            "volume": by_volume,
+            "price": by_price,
+            "gainers": by_gainers,
+            "count": len(verified_list)
+        }
+    except Exception as e:
+        print(f">>> Error en discover_markets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
